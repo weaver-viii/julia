@@ -443,8 +443,9 @@ end
 """
 macro inbounds(blk)
     :($(Expr(:inbounds,true));
-      $(esc(blk));
-      $(Expr(:inbounds,:pop)))
+      local val = $(esc(blk));
+      $(Expr(:inbounds,:pop));
+      val)
 end
 
 macro label(name::Symbol)
