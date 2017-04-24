@@ -38,8 +38,10 @@ unsafe_convert(::Type{Ref{T}}, x) where {T} = unsafe_convert(Ptr{T}, x)
 
 mutable struct RefValue{T} <: Ref{T}
     x::T
-    RefValue{T}() where {T} = new()
     RefValue{T}(x) where {T} = new(x)
+    RefValue{T}() where {T} = new()
+    RefValue{T}() where {T<:Ptr} = new(C_NULL)
+    RefValue{T}() where {T<:Number} = isbits(T) ? new(zero(T)) : new()
 end
 RefValue{T}(x::T) = RefValue{T}(x)
 isassigned(x::RefValue) = isdefined(x, :x)
