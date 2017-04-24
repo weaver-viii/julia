@@ -1322,6 +1322,10 @@ for fname in (:ones, :zeros)
     end
 end
 
+@deprecate Ref(x::AbstractArray) Ref(x, 1)
+@deprecate Ref(x::Ptr) Ref(x, 1)
+@deprecate Ref(x::Ref) x # or perhaps, `convert(Ref, x)`
+
 # END 0.6 deprecations
 
 # BEGIN 1.0 deprecations

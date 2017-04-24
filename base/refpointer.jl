@@ -44,13 +44,13 @@ end
 RefValue{T}(x::T) = RefValue{T}(x)
 isassigned(x::RefValue) = isdefined(x, :x)
 
-Ref(x::Ref) = x
 Ref(x::Any) = RefValue(x)
-Ref{T}(x::Ptr{T}, i::Integer=1) = x + (i-1)*Core.sizeof(T)
-Ref(x, i::Integer) = (i != 1 && error("Object only has one element"); Ref(x))
 (::Type{Ref{T}})() where {T} = RefValue{T}() # Ref{T}()
 (::Type{Ref{T}})(x) where {T} = RefValue{T}(x) # Ref{T}(x)
 convert(::Type{Ref{T}}, x) where {T} = RefValue{T}(x)
+
+Ref(x::Ref, i::Integer) = (i != 1 && error("Ref only has one element"); x)
+Ref(x::Ptr{T}, i::Integer) where {T} = x + (i - 1) * Core.sizeof(T)
 
 function unsafe_convert(P::Type{Ptr{T}}, b::RefValue{T}) where T
     if isbits(T)
@@ -74,7 +74,7 @@ end
 RefArray{T}(x::AbstractArray{T},i::Int,roots::Any) = RefArray{T,typeof(x),Any}(x, i, roots)
 RefArray{T}(x::AbstractArray{T},i::Int=1,roots::Void=nothing) = RefArray{T,typeof(x),Void}(x, i, nothing)
 convert(::Type{Ref{T}}, x::AbstractArray{T}) where {T} = RefArray(x, 1)
-Ref(x::AbstractArray, i::Integer=1) = RefArray(x, i)
+Ref(x::AbstractArray, i::Integer) = RefArray(x, i)
 
 function unsafe_convert(P::Type{Ptr{T}}, b::RefArray{T}) where T
     if isbits(T)
