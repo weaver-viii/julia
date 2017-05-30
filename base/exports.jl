@@ -405,6 +405,7 @@ export
     significand,
     sin,
     sinc,
+    sincos,
     sind,
     sinh,
     sinpi,
@@ -729,6 +730,9 @@ export
     ⊆,
     ⊈,
     ⊊,
+    ⊇,
+    ⊉,
+    ⊋,
     ∩,
     ∪,
 
@@ -1068,6 +1072,7 @@ export
     getaddrinfo,
     gethostname,
     getipaddr,
+    getpeername,
     getsockname,
     htol,
     hton,
@@ -1244,6 +1249,7 @@ export
     # parser internal
     @__FILE__,
     @__DIR__,
+    @__LINE__,
     @int128_str,
     @uint128_str,
     @big_str,

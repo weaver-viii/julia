@@ -2808,6 +2808,7 @@ testmi(typemax(UInt32)-UInt32(1000):typemax(UInt32), map(UInt32, 1:100))
 @test indices(1,1) == 1:1
 @test_throws BoundsError indices(1,-1)
 @test isinteger(Integer(2)) == true
+@test !isinteger(π)
 @test size(1) == ()
 @test length(1) == 1
 @test endof(1) == 1
@@ -2956,6 +2957,9 @@ end
         end
     end
     @test !iszero(nextfloat(BigFloat(0)))
+    for x in (π, e, γ, catalan, φ)
+        @test !iszero(x)
+    end
 
     # Array reduction
     @test !iszero([0, 1, 2, 3])

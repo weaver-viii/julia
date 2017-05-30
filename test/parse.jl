@@ -147,10 +147,10 @@ macro test999_str(args...); args; end
 
 # issue 11970
 @test parseall("""
-macro f(args...) end; @f ""
+    macro f(args...) end; @f "macro argument"
 """) == Expr(:toplevel,
-             Expr(:macro, Expr(:call, :f, Expr(:..., :args)), Expr(:block, Expr(:line, 1, :none))),
-             Expr(:macrocall, Symbol("@f"), ""))
+             Expr(:macro, Expr(:call, :f, Expr(:..., :args)), Expr(:block, LineNumberNode(1, :none))),
+             Expr(:macrocall, Symbol("@f"), LineNumberNode(1, :none), "macro argument"))
 
 # blocks vs. tuples
 @test parse("()") == Expr(:tuple)
@@ -351,7 +351,7 @@ parsehex(s) = parse(Int,s,16)
 # issue #17705
 @test parse("2e3_") == Expr(:call, :*, 2e3, :_)
 @test parse("2e-3_") == Expr(:call, :*, 2e-3, :_)
-@test parse("2e3_\"x\"") == Expr(:call, :*, 2e3, Expr(:macrocall, Symbol("@__str"), "x"))
+@test parse("2e3_\"x\"") == Expr(:call, :*, 2e3, Expr(:macrocall, Symbol("@__str"), LineNumberNode(1, :none), "x"))
 
 # multibyte spaces
 @test parse(Int, "3\u2003\u202F") == 3
@@ -514,7 +514,7 @@ let b = IOBuffer("""
                  end
                  f()
                  """)
-    @test Base.parse_input_line(b) == Expr(:let, Expr(:block, Expr(:line, 2, :none), :x), Expr(:(=), :x, :x))
+    @test Base.parse_input_line(b) == Expr(:let, Expr(:block, LineNumberNode(2, :none), :x), Expr(:(=), :x, :x))
     @test Base.parse_input_line(b) == Expr(:call, :f)
     @test Base.parse_input_line(b) === nothing
 end
@@ -574,7 +574,7 @@ f16517() = try error(); catch 0; end
 # issue #16671
 @test parse("1.") === 1.0
 
-isline(x) = isa(x,Expr) && x.head === :line
+isline(x) = isa(x, LineNumberNode)
 
 # issue #16672
 @test count(isline, parse("begin end").args) == 1
@@ -584,9 +584,9 @@ isline(x) = isa(x,Expr) && x.head === :line
 
 # issue #16736
 let
-    local lineoffset0 = @__LINE__ + 1
-    local lineoffset1 = @__LINE__
-    local lineoffset2 = @__LINE__ - 1
+    local lineoffset0 = @__LINE__() + 1
+    local lineoffset1 = @__LINE__()
+    local lineoffset2 = @__LINE__() - 1
     @test lineoffset0 == lineoffset1 == lineoffset2
 end
 
@@ -596,13 +596,13 @@ end
                  y
              end") == Expr(:try,
                            Expr(:block,
-                                Expr(:line, 1, :none),
+                                LineNumberNode(1, :none),
                                 :x),
                            false,
                            Expr(:block,
-                                Expr(:line, 2, :none),
+                                LineNumberNode(2, :none),
                                 Expr(:call, :test),
-                                Expr(:line, 3, :none),
+                                LineNumberNode(3, :none),
                                 :y))
 
 # test that pre 0.5 deprecated syntax is a parse error
@@ -673,6 +673,10 @@ end
 
 # error throwing branch from #10560
 @test_throws ArgumentError Base.tryparse_internal(Bool, "foo", 1, 2, 10, true)
+
+@test tryparse(Float64, "1.23") === Nullable(1.23)
+@test tryparse(Float32, "1.23") === Nullable(1.23f0)
+@test tryparse(Float16, "1.23") === Nullable(Float16(1.23))
 
 # PR #17393
 for op in (:.==, :.&, :.|, :.≤)
@@ -771,12 +775,12 @@ module B15838
 end
 @test A15838.@f() === nothing
 @test A15838.@f(1) === :b
-let nometh = expand(:(A15838.@f(1, 2)))
+let nometh = expand(:(A15838.@f(1, 2))), __source__ = LineNumberNode(@__LINE__, Symbol(@__FILE__))
     @test (nometh::Expr).head === :error
     @test length(nometh.args) == 1
     e = nometh.args[1]::MethodError
     @test e.f === getfield(A15838, Symbol("@f"))
-    @test e.args === (1,2)
+    @test e.args === (__source__, 1, 2)
 end
 
 # issue 10046
@@ -900,8 +904,8 @@ f1_exprs = get_expr_list(@code_typed(f1(1))[1])
 f2_exprs = get_expr_list(@code_typed(f2(1))[1])
 
 @test Meta.isexpr(f1_exprs[end], :return)
-@test is_pop_loc(f2_exprs[end - 1])
-@test Meta.isexpr(f2_exprs[end], :return)
+@test is_pop_loc(f2_exprs[end])
+@test Meta.isexpr(f2_exprs[end - 1], :return)
 
 if Base.JLOptions().code_coverage != 0 && Base.JLOptions().can_inline != 0
     @test count_meta_loc(f1_exprs) == 1
@@ -920,10 +924,10 @@ end
 @test :(x`s\`"\x\$\\`) == :(@x_cmd "s`\"\\x\\\$\\\\")
 
 # Check multiline command literals
-@test :```
+@test :(@cmd "multiline\ncommand\n") == :```
 multiline
 command
-``` == :(@cmd "multiline\ncommand\n")
+```
 
 macro julia_cmd(s)
     Meta.quot(parse(s))
@@ -976,7 +980,7 @@ let ..(x,y) = x + y
 end
 
 # issue #7669
-@test parse("@a(b=1, c=2)") == Expr(:macrocall, Symbol("@a"), :(b=1), :(c=2))
+@test parse("@a(b=1, c=2)") == Expr(:macrocall, Symbol("@a"), LineNumberNode(1, :none), :(b=1), :(c=2))
 
 # issue #19685
 let f = function (x; kw...)
@@ -1018,6 +1022,19 @@ end
 short_where_call = :(f(x::T) where T = T)
 @test short_where_call.args[2].head == :block
 
+# `where` with multi-line anonymous functions
+let f = function (x::T) where T
+            T
+        end
+    @test f(:x) === Symbol
+end
+
+let f = function (x::T, y::S) where T<:S where S
+            (T,S)
+        end
+    @test f(0,1) === (Int,Int)
+end
+
 # issue #20541
 @test parse("[a .!b]") == Expr(:hcat, :a, Expr(:call, :(.!), :b))
 
@@ -1053,7 +1070,7 @@ end
 @test expand(:(@err20000)) == Expr(:error, "oops!")
 
 # issue #20000
-@test parse("@m(a; b=c)") == Expr(:macrocall, Symbol("@m"),
+@test parse("@m(a; b=c)") == Expr(:macrocall, Symbol("@m"), LineNumberNode(1, :none),
                                   Expr(:parameters, Expr(:kw, :b, :c)), :a)
 
 # issue #21054
@@ -1107,3 +1124,74 @@ end
 # issue #21440
 @test parse("+(x::T,y::T) where {T} = 0") == parse("(+)(x::T,y::T) where {T} = 0")
 @test parse("a::b::c") == Expr(:(::), Expr(:(::), :a, :b), :c)
+
+# issue #21545
+f21545(::Type{<: AbstractArray{T,N} where N}) where T = T
+@test f21545(Array{Int8}) === Int8
+@test parse("<:{T} where T") == Expr(:where, Expr(:curly, :(<:), :T), :T)
+@test parse("<:(T) where T") == Expr(:where, Expr(:(<:), :T), :T)
+@test parse("<:{T}(T) where T") == Expr(:where, Expr(:call, Expr(:curly, :(<:), :T), :T), :T)
+
+# issue #21586
+macro m21586(x)
+    Expr(:kw, esc(x), 42)
+end
+
+f21586(; @m21586(a), @m21586(b)) = a + b
+@test f21586(a=10) == 52
+
+# issue #21604
+@test_nowarn @eval module Test21604
+    const Foo = Any
+    struct X
+        x::Foo
+    end
+end
+@test Test21604.X(1.0) === Test21604.X(1.0)
+
+# issue #20575
+@test_throws ParseError parse("\"a\"x")
+@test_throws ParseError parse("\"a\"begin end")
+
+# comment 298107224 on pull #21607
+module Test21607
+    using Base.Test
+
+    @test_warn(
+    "WARNING: imported binding for Any overwritten in module Test21607",
+    @eval const Any = Integer)
+
+    # check that X <: Core.Any, not Integer
+    mutable struct X; end
+    @test supertype(X) === Core.Any
+
+    # check that return type is Integer
+    f()::Any = 1.0
+    @test f() === 1
+
+    # check that constructor accepts Any
+    struct Y
+        x
+    end
+    @test Y(1.0) !== Y(1)
+
+    # check that function default argument type is Any
+    g(x) = x
+    @test g(1.0) === 1.0
+
+    # check that asserted variable type is Integer
+    @test let
+        x::Any = 1.0
+        x
+    end === 1
+
+    # check that unasserted variable type is not Integer
+    @test let
+        x = 1.0
+        x
+    end === 1.0
+end
+
+# issue #16937
+@test expand(:(f(2, a=1, w=3, c=3, w=4, b=2))) == Expr(:error,
+                                                       "keyword argument \"w\" repeated in call to \"f\"")

@@ -1,7 +1,7 @@
 # This file is a part of Julia. License is MIT: https://julialang.org/license
 
 # DO NOT ALTER ORDER OR SPACING OF METHODS BELOW
-const lineoffset = @__LINE__ + 0 # XXX: __LINE__ at the end of a line is off-by-one
+const lineoffset = @__LINE__
 ambig(x, y) = 1
 ambig(x::Integer, y) = 2
 ambig(x, y::Integer) = 3
@@ -9,9 +9,8 @@ ambig(x::Int, y::Int) = 4
 ambig(x::Number, y) = 5
 # END OF LINE NUMBER SENSITIVITY
 
-const curmod = current_module()
-const curmod_name = fullname(curmod)
-const curmod_str = curmod === Main ? "Main" : join(curmod_name, ".")
+# For curmod_*
+include("testenv.jl")
 
 ambigs = Any[[], [3], [2,5], [], [3]]
 
@@ -85,6 +84,16 @@ cfunction(ambig, Int, (UInt8, Int))  # test for a crash (doesn't throw an error)
 @test_throws MethodError ambig(2, 0x03)
 ambig(x, y::Integer) = 3
 @test_throws MethodError ambig(2, 0x03)
+
+# Method overwriting by an ambiguity should also invalidate the method cache (#21963)
+ambig(x::Union{Char, Int8}) = 'r'
+@test ambig('c') == 'r'
+@test ambig(Int8(1)) == 'r'
+@test_throws MethodError ambig(Int16(1))
+ambig(x::Union{Char, Int16}) = 's'
+@test_throws MethodError ambig('c')
+@test ambig(Int8(1)) == 'r'
+@test ambig(Int16(1)) == 's'
 
 # Automatic detection of ambiguities
 module Ambig1

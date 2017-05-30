@@ -362,7 +362,7 @@ function displaysize(io::TTY)
         if ispty(io)
             # io is actually a libuv pipe but a cygwin/msys2 pty
             try
-                h, w = map(x -> parse(Int, x), split(readstring(open(Base.Cmd(String["stty", "size"]), "r", io)[1])))
+                h, w = parse.(Int, split(readstring(open(Base.Cmd(String["stty", "size"]), "r", io).out)))
                 h > 0 || (h = default_size[1])
                 w > 0 || (w = default_size[2])
                 return h, w
@@ -863,7 +863,15 @@ buffer_writes(s::LibuvStream, bufsize) = (s.sendbuf=PipeBuffer(bufsize); s)
 
 ## low-level calls to libuv ##
 
-write(s::LibuvStream, b::UInt8) = write(s, Ref{UInt8}(b))
+function write(s::LibuvStream, b::UInt8)
+    if !isnull(s.sendbuf)
+        buf = get(s.sendbuf)
+        if nb_available(buf) + 1 < buf.maxsize
+            return write(buf, b)
+        end
+    end
+    return write(s, Ref{UInt8}(b))
+end
 
 function uv_writecb_task(req::Ptr{Void}, status::Cint)
     d = uv_req_data(req)
@@ -1007,25 +1015,26 @@ for (x, writable, unix_fd, c_symbol) in
     @eval begin
         function ($_f)(stream)
             global $x
+            posix_fd = _fd(stream)
             @static if is_windows()
-                ccall(:SetStdHandle,stdcall,Int32,(Int32,Ptr{Void}),
-                    $(-10 - unix_fd), Libc._get_osfhandle(_fd(stream)).handle)
-            else
-                dup(_fd(stream),  RawFD($unix_fd))
+                ccall(:SetStdHandle, stdcall, Int32, (Int32, Ptr{Void}),
+                    $(-10 - unix_fd), Libc._get_osfhandle(posix_fd).handle)
             end
+            dup(posix_fd,  RawFD($unix_fd))
             $x = stream
+            nothing
         end
         function ($f)(handle::Union{LibuvStream,IOStream})
             $(_f)(handle)
             unsafe_store!(cglobal($(Expr(:quote,c_symbol)),Ptr{Void}),
                 handle.handle)
-            handle
+            return handle
         end
         function ($f)()
-            read,write = (PipeEndpoint(), PipeEndpoint())
-            link_pipe(read,$(writable),write,$(!writable))
-            ($f)($(writable? :write : :read))
-            (read,write)
+            read, write = (PipeEndpoint(), PipeEndpoint())
+            link_pipe(read, $(writable), write, $(!writable))
+            ($f)($(writable ? :write : :read))
+            return (read, write)
         end
     end
 end

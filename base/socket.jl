@@ -24,7 +24,7 @@ end
 """
     IPv4(host::Integer) -> IPv4
 
-Returns an IPv4 object from ip address `host` formatted as an `Integer`.
+Returns an IPv4 object from ip address `host` formatted as an [`Integer`](@ref).
 
 ```jldoctest
 julia> IPv4(3223256218)
@@ -76,7 +76,7 @@ end
 """
     IPv6(host::Integer) -> IPv6
 
-Returns an IPv6 object from ip address `host` formatted as an `Integer`.
+Returns an IPv6 object from ip address `host` formatted as an [`Integer`](@ref).
 
 ```jldoctest
 julia> IPv6(3223256218)
@@ -282,10 +282,14 @@ mutable struct TCPSocket <: LibuvStream
         return tcp
     end
 end
-function TCPSocket()
+
+# kw arg "delay": if true, libuv delays creation of the socket fd till the first bind call
+function TCPSocket(; delay=true)
     tcp = TCPSocket(Libc.malloc(_sizeof_uv_tcp), StatusUninit)
-    err = ccall(:uv_tcp_init, Cint, (Ptr{Void}, Ptr{Void}),
-                eventloop(), tcp.handle)
+    af_spec = delay ? 0 : 2   # AF_UNSPEC is 0, AF_INET is 2
+
+    err = ccall(:uv_tcp_init_ex, Cint, (Ptr{Void}, Ptr{Void}, Cuint),
+                eventloop(), tcp.handle, af_spec)
     uv_error("failed to create tcp socket", err)
     tcp.status = StatusInit
     return tcp
@@ -325,7 +329,7 @@ iswritable(io::TCPSocket) = isopen(io) && io.status != StatusClosing
 _jl_connect_raw(sock::TCPSocket, sockaddr::Ptr{Void}) =
     ccall(:jl_connect_raw, Int32, (Ptr{Void}, Ptr{Void}, Ptr{Void}), sock.handle, sockaddr, uv_jl_connectcb::Ptr{Void})
 _jl_sockaddr_from_addrinfo(addrinfo::Ptr{Void}) =
-    ccall(:jl_sockaddr_from_addrinfo, Ptr{Void}, (Ptr{Void}, ), addrinfo)
+    ccall(:jl_sockaddr_from_addrinfo, Ptr{Void}, (Ptr{Void},), addrinfo)
 _jl_sockaddr_set_port(ptr::Ptr{Void}, port::UInt16) =
     ccall(:jl_sockaddr_set_port, Void, (Ptr{Void}, UInt16), ptr, port)
 
@@ -451,8 +455,8 @@ Set UDP socket options.
 
 * `multicast_loop`: loopback for multicast packets (default: `true`).
 * `multicast_ttl`: TTL for multicast packets (default: `nothing`).
-* `enable_broadcast`: flag must be set to `true` if socket will be used for broadcast messages,
-  or else the UDP system will return an access error (default: `false`).
+* `enable_broadcast`: flag must be set to `true` if socket will be used for broadcast
+  messages, or else the UDP system will return an access error (default: `false`).
 * `ttl`: Time-to-live of packets sent on the socket (default: `nothing`).
 """
 function setopt(sock::UDPSocket; multicast_loop = nothing, multicast_ttl=nothing, enable_broadcast=nothing, ttl=nothing)
@@ -589,18 +593,18 @@ function uv_getaddrinfocb(req::Ptr{Void}, status::Cint, addrinfo::Ptr{Void})
     cb = unsafe_pointer_to_objref(data)::Function
     pop!(callback_dict,cb) # using pop forces an error if cb not in callback_dict
     if status != 0 || addrinfo == C_NULL
-        cb(UVError("uv_getaddrinfocb received an unexpected status code", status))
+        invokelatest(cb, UVError("uv_getaddrinfocb received an unexpected status code", status))
     else
         freeaddrinfo = addrinfo
         while addrinfo != C_NULL
             sockaddr = ccall(:jl_sockaddr_from_addrinfo, Ptr{Void}, (Ptr{Void},), addrinfo)
             if ccall(:jl_sockaddr_is_ip4, Int32, (Ptr{Void},), sockaddr) == 1
-                cb(IPv4(ntoh(ccall(:jl_sockaddr_host4, UInt32, (Ptr{Void},), sockaddr))))
+                invokelatest(cb, IPv4(ntoh(ccall(:jl_sockaddr_host4, UInt32, (Ptr{Void},), sockaddr))))
                 break
             #elseif ccall(:jl_sockaddr_is_ip6, Int32, (Ptr{Void},), sockaddr) == 1
             #    host = Vector{UInt128}(1)
             #    scope_id = ccall(:jl_sockaddr_host6, UInt32, (Ptr{Void}, Ptr{UInt128}), sockaddr, host)
-            #    cb(IPv6(ntoh(host[1])))
+            #    invokelatest(cb, IPv6(ntoh(host[1])))
             #    break
             end
             addrinfo = ccall(:jl_next_from_addrinfo, Ptr{Void}, (Ptr{Void},), addrinfo)
@@ -822,6 +826,10 @@ function listenany(host::IPAddr, default_port)
     while true
         sock = TCPServer()
         if bind(sock, addr) && trylisten(sock) == 0
+            if default_port == 0
+                _addr, port = getsockname(sock)
+                return (port, sock)
+            end
             return (addr.port, sock)
         end
         close(sock)
@@ -837,19 +845,30 @@ listenany(default_port) = listenany(IPv4(UInt32(0)), default_port)
 """
     getsockname(sock::Union{TCPServer, TCPSocket}) -> (IPAddr, UInt16)
 
-Get the IP address and the port that the given `TCPSocket` is connected to
-(or bound to, in the case of `TCPServer`).
+Get the IP address and port that the given socket is bound to.
 """
-function getsockname(sock::Union{TCPServer,TCPSocket})
+getsockname(sock::Union{TCPSocket, TCPServer}) = _sockname(sock, true)
+
+
+"""
+    getpeername(sock::TCPSocket) -> (IPAddr, UInt16)
+
+Get the IP address and port of the remote endpoint that the given
+socket is connected to. Valid only for connected TCP sockets.
+"""
+getpeername(sock::TCPSocket) = _sockname(sock, false)
+
+function _sockname(sock, self=true)
     rport = Ref{Cushort}(0)
     raddress = zeros(UInt8, 16)
     rfamily = Ref{Cuint}(0)
-    r = if isa(sock, TCPServer)
-        ccall(:jl_tcp_getsockname, Int32,
+
+    if self
+        r = ccall(:jl_tcp_getsockname, Int32,
                 (Ptr{Void}, Ref{Cushort}, Ptr{Void}, Ref{Cuint}),
                 sock.handle, rport, raddress, rfamily)
     else
-        ccall(:jl_tcp_getpeername, Int32,
+        r = ccall(:jl_tcp_getpeername, Int32,
                 (Ptr{Void}, Ref{Cushort}, Ptr{Void}, Ref{Cuint}),
                 sock.handle, rport, raddress, rfamily)
     end
@@ -876,7 +895,7 @@ function getsockname(sock::Union{TCPServer,TCPSocket})
             naddr = ntoh(unsafe_load(Ptr{UInt128}(pointer(raddress)), 1))
             addr = IPv6(naddr)
         else
-            error("unsupported address family: $(getindex(rfamily))")
+            error(string("unsupported address family: ", getindex(rfamily)))
         end
     else
         error("cannot obtain socket name")

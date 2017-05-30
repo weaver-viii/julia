@@ -18,37 +18,43 @@
 # the name of the function, which is used to ensure that the deprecation warning
 # is only printed the first time for each call place.
 
-macro deprecate(old,new,ex=true)
+macro deprecate(old, new, ex=true)
     meta = Expr(:meta, :noinline)
     @gensym oldmtname
-    if isa(old,Symbol)
-        oldname = Expr(:quote,old)
-        newname = Expr(:quote,new)
+    if isa(old, Symbol)
+        oldname = Expr(:quote, old)
+        newname = Expr(:quote, new)
         Expr(:toplevel,
-            ex ? Expr(:export,esc(old)) : nothing,
+            ex ? Expr(:export, esc(old)) : nothing,
             :(function $(esc(old))(args...)
                   $meta
-                  depwarn(string($oldname," is deprecated, use ",$newname," instead."),
+                  depwarn(string($oldname, " is deprecated, use ", $newname, " instead."),
                           $oldmtname)
                   $(esc(new))(args...)
               end),
             :(const $oldmtname = Core.Typeof($(esc(old))).name.mt.name))
-    elseif isa(old,Expr) && old.head == :call
+    elseif isa(old, Expr) && (old.head == :call || old.head == :where)
         remove_linenums!(new)
         oldcall = sprint(show_unquoted, old)
         newcall = sprint(show_unquoted, new)
-        oldsym = if isa(old.args[1],Symbol)
-            old.args[1]::Symbol
-        elseif isa(old.args[1],Expr) && old.args[1].head == :curly
-            old.args[1].args[1]::Symbol
+        # if old.head is a :where, step down one level to the :call to avoid code duplication below
+        callexpr = old.head == :call ? old : old.args[1]
+        if callexpr.head == :call
+            if isa(callexpr.args[1], Symbol)
+                oldsym = callexpr.args[1]::Symbol
+            elseif isa(callexpr.args[1], Expr) && callexpr.args[1].head == :curly
+                oldsym = callexpr.args[1].args[1]::Symbol
+            else
+                error("invalid usage of @deprecate")
+            end
         else
             error("invalid usage of @deprecate")
         end
         Expr(:toplevel,
-            ex ? Expr(:export,esc(oldsym)) : nothing,
+            ex ? Expr(:export, esc(oldsym)) : nothing,
             :($(esc(old)) = begin
                   $meta
-                  depwarn(string($oldcall," is deprecated, use ",$newcall," instead."),
+                  depwarn(string($oldcall, " is deprecated, use ", $newcall, " instead."),
                           $oldmtname)
                   $(esc(new))
               end),
@@ -194,7 +200,7 @@ end
 # Deprecate vectorized unary functions over sparse matrices in favor of compact broadcast syntax (#17265).
 for f in (:sin, :sinh, :sind, :asin, :asinh, :asind,
         :tan, :tanh, :tand, :atan, :atanh, :atand,
-        :sinpi, :cosc, :ceil, :floor, :trunc, :round, :real, :imag,
+        :sinpi, :cosc, :ceil, :floor, :trunc, :round,
         :log1p, :expm1, :abs, :abs2,
         :log, :log2, :log10, :exp, :exp2, :exp10, :sinc, :cospi,
         :cos, :cosh, :cosd, :acos, :acosd,
@@ -633,11 +639,11 @@ _broadcast_zpreserving!(args...) = broadcast!(args...)
 # note: promote_eltype_op also deprecated, defined later in this file
 _broadcast_zpreserving(f, As...) =
     broadcast!(f, similar(Array{_promote_eltype_op(f, As...)}, Base.Broadcast.broadcast_indices(As...)), As...)
-_broadcast_zpreserving{Tv1,Ti1,Tv2,Ti2}(f::Function, A_1::SparseMatrixCSC{Tv1,Ti1}, A_2::SparseMatrixCSC{Tv2,Ti2}) =
+_broadcast_zpreserving(f::Function, A_1::SparseMatrixCSC{Tv1,Ti1}, A_2::SparseMatrixCSC{Tv2,Ti2}) where {Tv1,Ti1,Tv2,Ti2} =
     _broadcast_zpreserving!(f, spzeros(promote_type(Tv1, Tv2), promote_type(Ti1, Ti2), Base.to_shape(Base.Broadcast.broadcast_indices(A_1, A_2))), A_1, A_2)
-_broadcast_zpreserving{Ti}(f::Function, A_1::SparseMatrixCSC{<:Any,Ti}, A_2::Union{Array,BitArray,Number}) =
+_broadcast_zpreserving(f::Function, A_1::SparseMatrixCSC{<:Any,Ti}, A_2::Union{Array,BitArray,Number}) where {Ti} =
     _broadcast_zpreserving!(f, spzeros(promote_eltype(A_1, A_2), Ti, Base.to_shape(Base.Broadcast.broadcast_indices(A_1, A_2))), A_1, A_2)
-_broadcast_zpreserving{Ti}(f::Function, A_1::Union{Array,BitArray,Number}, A_2::SparseMatrixCSC{<:Any,Ti}) =
+_broadcast_zpreserving(f::Function, A_1::Union{Array,BitArray,Number}, A_2::SparseMatrixCSC{<:Any,Ti}) where {Ti} =
     _broadcast_zpreserving!(f, spzeros(promote_eltype(A_1, A_2), Ti, Base.to_shape(Base.Broadcast.broadcast_indices(A_1, A_2))), A_1, A_2)
 
 function _depstring_bczpres()
@@ -1327,6 +1333,26 @@ end
 @deprecate Ref(x::Ref) x # or perhaps, `convert(Ref, x)`
 
 # END 0.6 deprecations
+
+# BEGIN 0.7 deprecations
+
+# 12807
+start(::Union{Process, ProcessChain}) = 1
+done(::Union{Process, ProcessChain}, i::Int) = (i == 3)
+next(p::Union{Process, ProcessChain}, i::Int) = (getindex(p, i), i + 1)
+@noinline function getindex(p::Union{Process, ProcessChain}, i::Int)
+    depwarn("open(cmd) now returns only a Process<:IO object", :getindex)
+    return i == 1 ? getfield(p, p.openstream) : p
+end
+
+@deprecate cond(F::LinAlg.LU, p::Integer) cond(full(F), p)
+
+# PR #21359
+@deprecate srand(r::MersenneTwister, filename::AbstractString, n::Integer=4) srand(r, read!(filename, Array{UInt32}(Int(n))))
+@deprecate srand(filename::AbstractString, n::Integer=4) srand(read!(filename, Array{UInt32}(Int(n))))
+@deprecate MersenneTwister(filename::AbstractString)  srand(MersenneTwister(0), read!(filename, Array{UInt32}(Int(4))))
+
+# END 0.7 deprecations
 
 # BEGIN 1.0 deprecations
 # END 1.0 deprecations

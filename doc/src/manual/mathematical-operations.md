@@ -21,7 +21,7 @@ are supported on all primitive numeric types:
 | `x ^ y`    | power          | raises `x` to the `y`th power          |
 | `x % y`    | remainder      | equivalent to `rem(x,y)`               |
 
-as well as the negation on `Bool` types:
+as well as the negation on [`Bool`](@ref) types:
 
 | Expression | Name     | Description                              |
 |:---------- |:-------- |:---------------------------------------- |
@@ -360,7 +360,7 @@ Julia applies the following order of operations, from highest precedence to lowe
 | Assignments    | `= += -= *= /= //= \= ^= ÷= %= \|= &= ⊻= <<= >>= >>>=`                                            |
 
 For a complete list of *every* Julia operator's precedence, see the top of this file:
-[julia/src/julia-parser.scm](https://github.com/JuliaLang/julia/blob/master/src/julia-parser.scm)
+[`src/julia-parser.scm`](https://github.com/JuliaLang/julia/blob/master/src/julia-parser.scm)
 
 You can also find the numerical precedence for any given operator via the built-in function `Base.operator_precedence`, where higher numbers take precedence:
 
@@ -397,7 +397,7 @@ julia> Int8(127)
 julia> Int8(128)
 ERROR: InexactError()
 Stacktrace:
- [1] Int8(::Int64) at ./sysimg.jl:24
+ [1] Int8(::Int64) at ./sysimg.jl:77
 
 julia> Int8(127.0)
 127
@@ -405,14 +405,14 @@ julia> Int8(127.0)
 julia> Int8(3.14)
 ERROR: InexactError()
 Stacktrace:
- [1] convert(::Type{Int8}, ::Float64) at ./float.jl:658
- [2] Int8(::Float64) at ./sysimg.jl:24
+ [1] convert(::Type{Int8}, ::Float64) at ./float.jl:659
+ [2] Int8(::Float64) at ./sysimg.jl:77
 
 julia> Int8(128.0)
 ERROR: InexactError()
 Stacktrace:
- [1] convert(::Type{Int8}, ::Float64) at ./float.jl:658
- [2] Int8(::Float64) at ./sysimg.jl:24
+ [1] convert(::Type{Int8}, ::Float64) at ./float.jl:659
+ [2] Int8(::Float64) at ./sysimg.jl:77
 
 julia> 127 % Int8
 127
@@ -426,8 +426,8 @@ julia> round(Int8,127.4)
 julia> round(Int8,127.6)
 ERROR: InexactError()
 Stacktrace:
- [1] trunc(::Type{Int8}, ::Float64) at ./float.jl:651
- [2] round(::Type{Int8}, ::Float64) at ./float.jl:337
+ [1] trunc(::Type{Int8}, ::Float64) at ./float.jl:652
+ [2] round(::Type{Int8}, ::Float64) at ./float.jl:338
 ```
 
 See [Conversion and Promotion](@ref conversion-and-promotion) for how to define your own conversions and promotions.

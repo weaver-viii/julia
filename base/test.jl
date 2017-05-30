@@ -115,7 +115,7 @@ end
     Error
 
 The test condition couldn't be evaluated due to an exception, or
-it evaluated to something other than a `Bool`.
+it evaluated to something other than a [`Bool`](@ref).
 In the case of `@test_broken` it is used to indicate that an
 unexpected `Pass` `Result` occurred.
 """
@@ -848,6 +848,9 @@ function testset_beginend(args, tests)
     # action (such as reporting the results)
     quote
         ts = $(testsettype)($desc; $options...)
+        # this empty loop is here to force the block to be compiled,
+        # which is needed for backtrace scrubbing to work correctly.
+        while false; end
         push_testset(ts)
         try
             $(esc(tests))

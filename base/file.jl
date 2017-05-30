@@ -359,6 +359,7 @@ mktemp(parent)
     mktempdir(parent=tempdir())
 
 Create a temporary directory in the `parent` directory and return its path.
+If `parent` does not exist, throw an error.
 """
 mktempdir(parent)
 
@@ -366,7 +367,8 @@ mktempdir(parent)
 """
     mktemp(f::Function, parent=tempdir())
 
-Apply the function `f` to the result of `mktemp(parent)` and remove the temporary file upon completion.
+Apply the function `f` to the result of [`mktemp(parent)`](@ref) and remove the
+temporary file upon completion.
 """
 function mktemp(fn::Function, parent=tempdir())
     (tmp_path, tmp_io) = mktemp(parent)
@@ -381,8 +383,8 @@ end
 """
     mktempdir(f::Function, parent=tempdir())
 
-Apply the function `f` to the result of `mktempdir(parent)` and remove the temporary
-directory upon completion.
+Apply the function `f` to the result of [`mktempdir(parent)`](@ref) and remove the
+temporary directory upon completion.
 """
 function mktempdir(fn::Function, parent=tempdir())
     tmpdir = mktempdir(parent)
@@ -463,8 +465,8 @@ function walkdir(root; topdown=true, follow_symlinks=false, onerror=throw)
         close(chnl)
         return chnl
     end
-    dirs = Array{eltype(content)}(0)
-    files = Array{eltype(content)}(0)
+    dirs = Vector{eltype(content)}(0)
+    files = Vector{eltype(content)}(0)
     for name in content
         if isdir(joinpath(root, name))
             push!(dirs, name)
@@ -581,12 +583,12 @@ function readlink(path::AbstractString)
             (Ptr{Void}, Ptr{Void}, Cstring, Ptr{Void}),
             eventloop(), req, path, C_NULL)
         if ret < 0
-            ccall(:uv_fs_req_cleanup, Void, (Ptr{Void}, ), req)
+            ccall(:uv_fs_req_cleanup, Void, (Ptr{Void},), req)
             uv_error("readlink", ret)
             assert(false)
         end
-        tgt = unsafe_string(ccall(:jl_uv_fs_t_ptr, Ptr{Cchar}, (Ptr{Void}, ), req))
-        ccall(:uv_fs_req_cleanup, Void, (Ptr{Void}, ), req)
+        tgt = unsafe_string(ccall(:jl_uv_fs_t_ptr, Ptr{Cchar}, (Ptr{Void},), req))
+        ccall(:uv_fs_req_cleanup, Void, (Ptr{Void},), req)
         return tgt
     finally
         Libc.free(req)

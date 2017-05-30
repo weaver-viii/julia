@@ -85,7 +85,7 @@ static jl_value_t *do_invoke(jl_value_t **args, size_t nargs, interpreter_state 
     for (i = 1; i < nargs; i++)
         argv[i - 1] = eval(args[i], s);
     jl_method_instance_t *meth = (jl_method_instance_t*)args[0];
-    assert(jl_is_method_instance(meth) && !meth->inInference);
+    assert(jl_is_method_instance(meth));
     jl_value_t *result = jl_call_method_internal(meth, argv, nargs - 1);
     JL_GC_POP();
     return result;
@@ -470,10 +470,7 @@ static jl_value_t *eval(jl_value_t *e, interpreter_state *s)
             b->value = temp;
             jl_rethrow();
         }
-        if (dt->name->names == jl_emptysvec)
-            dt->layout = jl_void_type->layout; // reuse the same layout for all singletons
-        else if (jl_is_leaf_type((jl_value_t*)dt))
-            jl_compute_field_offsets(dt);
+        jl_compute_field_offsets(dt);
         if (para == (jl_value_t*)jl_emptysvec && jl_is_datatype_make_singleton(dt)) {
             dt->instance = jl_gc_alloc(ptls, 0, dt);
             jl_gc_wb(dt, dt->instance);

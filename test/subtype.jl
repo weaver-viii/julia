@@ -1071,6 +1071,11 @@ end
                Tuple{C20992{S, n, T, D, d} where d where D where T where n where S, Any},
                Tuple{C20992, Int})
 
+# Issue #19414
+let ex = try struct A19414 <: Base.AbstractSet end catch e; e end
+    @test isa(ex, ErrorException) && ex.msg == "invalid subtyping in definition of A19414"
+end
+
 # issue #20103, OP and comments
 struct TT20103{X,Y} end
 f20103{X,Y}(::Type{TT20103{X,Y}},x::X,y::Y) = 1
@@ -1094,3 +1099,12 @@ let T1 = Val{Val{Val{Union{Int8,Int16,Int32,Int64,UInt8,UInt16}}}},
     T2 = Val{Val{Val{Union{Int8,Int16,Int32,Int64,UInt8, S}}}} where S
     @test T1 <: T2
 end
+
+# issue #21613
+abstract type A21613{S <: Tuple} end
+struct B21613{S <: Tuple, L} <: A21613{S}
+    data::NTuple{L,Float64}
+end
+@testintersect(Tuple{Type{B21613{Tuple{L},L}} where L, Any},
+               Tuple{Type{SA}, Tuple} where SA<:(A21613{S} where S<:Tuple),
+               Tuple{Type{B21613{Tuple{L},L}} where L, Tuple})

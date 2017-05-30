@@ -37,7 +37,7 @@ Stack information representing execution context, with the following fields:
 
   True if the code is from an inlined frame.
 
-- `pointer::Int64`
+- `pointer::UInt64`
 
   Representation of the pointer to the execution context as returned by `backtrace`.
 
@@ -124,7 +124,7 @@ inlined at that point, innermost function first.
 function lookup(pointer::Ptr{Void})
     infos = ccall(:jl_lookup_code_address, Any, (Ptr{Void}, Cint), pointer - 1, false)
     isempty(infos) && return [StackFrame(empty_sym, empty_sym, -1, Nullable{Core.MethodInstance}(), true, false, convert(UInt64, pointer))]
-    res = Array{StackFrame}(length(infos))
+    res = Vector{StackFrame}(length(infos))
     for i in 1:length(infos)
         info = infos[i]
         @assert(length(info) == 7)
@@ -135,6 +135,10 @@ function lookup(pointer::Ptr{Void})
 end
 
 lookup(pointer::UInt) = lookup(convert(Ptr{Void}, pointer))
+
+# allow lookup on already-looked-up data for easier handling of pre-processed frames
+lookup(s::StackFrame) = StackFrame[s]
+lookup(s::Tuple{StackFrame,Int}) = StackFrame[s[1]]
 
 """
     stacktrace([trace::Vector{Ptr{Void}},] [c_funcs::Bool=false]) -> StackTrace

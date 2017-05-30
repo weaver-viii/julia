@@ -75,7 +75,7 @@ example program calls this before returning from `main`.
 
 ### Using julia-config to automatically determine build parameters
 
-The script *julia-config.jl* was created to aid in determining what build parameters are required
+The script `julia-config.jl` was created to aid in determining what build parameters are required
 by a program that uses embedded Julia.  This script uses the build parameters and system configuration
 of the particular Julia distribution it is invoked by to export the necessary compiler flags for
 an embedding program to interact with that distribution.  This script is located in the Julia
@@ -97,8 +97,8 @@ int main(int argc, char *argv[])
 
 #### On the command line
 
-A simple use of this script is from the command line.  Assuming that *julia-config.jl* is located
-in */usr/local/julia/share/julia*, it can be invoked on the command line directly and takes any
+A simple use of this script is from the command line.  Assuming that `julia-config.jl` is located
+in `/usr/local/julia/share/julia`, it can be invoked on the command line directly and takes any
 combination of 3 flags:
 
 ```
@@ -106,7 +106,7 @@ combination of 3 flags:
 Usage: julia-config [--cflags|--ldflags|--ldlibs]
 ```
 
-If the above example source is saved in the file *embed_example.c*, then the following command
+If the above example source is saved in the file `embed_example.c`, then the following command
 will compile it into a running program on Linux and Windows (MSYS2 environment), or if on OS/X,
 then substitute `clang` for `gcc`.:
 
@@ -118,8 +118,8 @@ then substitute `clang` for `gcc`.:
 
 But in general, embedding projects will be more complicated than the above, and so the following
 allows general makefile support as well – assuming GNU make because of the use of the **shell**
-macro expansions.  Additionally, though many times *julia-config.jl* may be found in the directory
-*/usr/local*, this is not necessarily the case, but Julia can be used to locate *julia-config.jl*
+macro expansions.  Additionally, though many times `julia-config.jl` may be found in the directory
+`/usr/local`, this is not necessarily the case, but Julia can be used to locate `julia-config.jl`
 too, and the makefile can be used to take advantage of that.  The above example is extended to
 use a Makefile:
 
@@ -133,15 +133,15 @@ LDLIBS   += $(shell $(JL_SHARE)/julia-config.jl --ldlibs)
 all: embed_example
 ```
 
-Now the build command is simply **make**.
+Now the build command is simply `make`.
 
 ## Converting Types
 
 Real applications will not just need to execute expressions, but also return their values to the
 host program. `jl_eval_string` returns a `jl_value_t*`, which is a pointer to a heap-allocated
-Julia object. Storing simple data types like `Float64` in this way is called `boxing`, and extracting
-the stored primitive data is called `unboxing`. Our improved sample program that calculates the
-square root of 2 in Julia and reads back the result in C looks as follows:
+Julia object. Storing simple data types like [`Float64`](@ref) in this way is called `boxing`,
+and extracting the stored primitive data is called `unboxing`. Our improved sample program that
+calculates the square root of 2 in Julia and reads back the result in C looks as follows:
 
 ```c
 jl_value_t *ret = jl_eval_string("sqrt(2.0)");
@@ -157,9 +157,9 @@ else {
 
 In order to check whether `ret` is of a specific Julia type, we can use the
 `jl_isa`, `jl_typeis`, or `jl_is_...` functions.
-By typing `typeof(sqrt(2.0))` into the Julia shell we can see that the return type is `Float64`
-(`double` in C). To convert the boxed Julia value into a C double the `jl_unbox_float64` function
-is used in the above code snippet.
+By typing `typeof(sqrt(2.0))` into the Julia shell we can see that the return type is
+[`Float64`](@ref) (`double` in C). To convert the boxed Julia value into a C double the
+`jl_unbox_float64` function is used in the above code snippet.
 
 Corresponding `jl_box_...` functions are used to convert the other way:
 

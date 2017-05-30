@@ -685,8 +685,8 @@ end
 repl_filename(repl, hp::REPLHistoryProvider) = "REPL[$(length(hp.history)-hp.start_idx)]"
 repl_filename(repl, hp) = "REPL"
 
-const JL_PROMT_PASTE = Ref(true)
-enable_promtpaste(v::Bool) = JL_PROMT_PASTE[] = v
+const JL_PROMPT_PASTE = Ref(true)
+enable_promptpaste(v::Bool) = JL_PROMPT_PASTE[] = v
 
 function setup_interface(repl::LineEditREPL; hascolor = repl.hascolor, extra_repl_keymap = Dict{Any,Any}[])
     ###
@@ -836,7 +836,7 @@ function setup_interface(repl::LineEditREPL; hascolor = repl.hascolor, extra_rep
             firstline = true
             isprompt_paste = false
             while !done(input, oldpos) # loop until all lines have been executed
-                if JL_PROMT_PASTE[]
+                if JL_PROMPT_PASTE[]
                     # Check if the next statement starts with "julia> ", in that case
                     # skip it. But first skip whitespace
                     while input[oldpos] in ('\n', ' ', '\t')
@@ -891,11 +891,11 @@ function setup_interface(repl::LineEditREPL; hascolor = repl.hascolor, extra_rep
             end
         end,
 
-        # Open the editor at the location of a stackframe
+        # Open the editor at the location of a stackframe or method
         # This is accessing a global variable that gets set in
-        # the show_backtrace function.
+        # the show_backtrace and show_method_table functions.
         "^Q" => (s, o...) -> begin
-            linfos = Base.LAST_BACKTRACE_LINE_INFOS
+            linfos = Base.LAST_SHOWN_LINE_INFOS
             str = String(take!(LineEdit.buffer(s)))
             n = tryparse(Int, str)
             isnull(n) && @goto writeback

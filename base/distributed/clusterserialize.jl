@@ -10,6 +10,7 @@ mutable struct ClusterSerializer{I<:IO} <: AbstractSerializer
     io::I
     counter::Int
     table::ObjectIdDict
+    pending_refs::Vector{Int}
 
     pid::Int                                     # Worker we are connected to.
     tn_obj_sent::Set{UInt64}                     # TypeName objects sent
@@ -19,7 +20,7 @@ mutable struct ClusterSerializer{I<:IO} <: AbstractSerializer
     anonfunc_id::UInt64
 
     function ClusterSerializer{I}(io::I) where I<:IO
-        new(io, 0, ObjectIdDict(), Base.worker_id_from_socket(io),
+        new(io, 0, ObjectIdDict(), Int[], Base.worker_id_from_socket(io),
             Set{UInt64}(), Dict{UInt64, UInt64}(), Dict{UInt64, Vector{Symbol}}(), 0)
     end
 end
@@ -113,7 +114,7 @@ function syms_2b_sent(s::ClusterSerializer, identifier)
             oid = object_id(v)
             if haskey(s.glbs_sent, oid)
                 # We have sent this object before, see if it has changed.
-                s.glbs_sent[oid] != hash(v) && push!(lst, sym)
+                s.glbs_sent[oid] != hash(sym, hash(v)) && push!(lst, sym)
             else
                 push!(lst, sym)
             end
@@ -142,7 +143,7 @@ function serialize_global_from_main(s::ClusterSerializer, sym)
             end
         end
     end
-    record_v && (s.glbs_sent[oid] = hash(v))
+    record_v && (s.glbs_sent[oid] = hash(sym, hash(v)))
 
     serialize(s, isconst(Main, sym))
     serialize(s, v)

@@ -135,16 +135,16 @@ function tril!(D::Diagonal,k::Integer=0)
     return D
 end
 
-==(Da::Diagonal, Db::Diagonal) = Da.diag == Db.diag
--(A::Diagonal)=Diagonal(-A.diag)
-+(Da::Diagonal, Db::Diagonal) = Diagonal(Da.diag + Db.diag)
--(Da::Diagonal, Db::Diagonal) = Diagonal(Da.diag - Db.diag)
+(==)(Da::Diagonal, Db::Diagonal) = Da.diag == Db.diag
+(-)(A::Diagonal) = Diagonal(-A.diag)
+(+)(Da::Diagonal, Db::Diagonal) = Diagonal(Da.diag + Db.diag)
+(-)(Da::Diagonal, Db::Diagonal) = Diagonal(Da.diag - Db.diag)
 
-*(x::Number, D::Diagonal) = Diagonal(x * D.diag)
-*(D::Diagonal, x::Number) = Diagonal(D.diag * x)
-/(D::Diagonal, x::Number) = Diagonal(D.diag / x)
-*(Da::Diagonal, Db::Diagonal) = Diagonal(Da.diag .* Db.diag)
-*(D::Diagonal, V::AbstractVector) = D.diag .* V
+(*)(x::Number, D::Diagonal) = Diagonal(x * D.diag)
+(*)(D::Diagonal, x::Number) = Diagonal(D.diag * x)
+(/)(D::Diagonal, x::Number) = Diagonal(D.diag / x)
+(*)(Da::Diagonal, Db::Diagonal) = Diagonal(Da.diag .* Db.diag)
+(*)(D::Diagonal, V::AbstractVector) = D.diag .* V
 
 (*)(A::AbstractTriangular, D::Diagonal) = A_mul_B!(copy(A), D)
 (*)(D::Diagonal, B::AbstractTriangular) = A_mul_B!(D, copy(B))
@@ -235,8 +235,8 @@ Ac_mul_B!(out::AbstractMatrix, A::Diagonal, in::AbstractMatrix) = out .= ctransp
 At_mul_B!(out::AbstractMatrix, A::Diagonal, in::AbstractMatrix) = out .= transpose.(A.diag) .* in
 
 
-/(Da::Diagonal, Db::Diagonal) = Diagonal(Da.diag ./ Db.diag)
-function A_ldiv_B!{T}(D::Diagonal{T}, v::AbstractVector{T})
+(/)(Da::Diagonal, Db::Diagonal) = Diagonal(Da.diag ./ Db.diag)
+function A_ldiv_B!(D::Diagonal{T}, v::AbstractVector{T}) where T
     if length(v) != length(D.diag)
         throw(DimensionMismatch("diagonal matrix is $(length(D.diag)) by $(length(D.diag)) but right hand side has $(length(v)) rows"))
     end
@@ -249,7 +249,7 @@ function A_ldiv_B!{T}(D::Diagonal{T}, v::AbstractVector{T})
     end
     v
 end
-function A_ldiv_B!{T}(D::Diagonal{T}, V::AbstractMatrix{T})
+function A_ldiv_B!(D::Diagonal{T}, V::AbstractMatrix{T}) where T
     if size(V,1) != length(D.diag)
         throw(DimensionMismatch("diagonal matrix is $(length(D.diag)) by $(length(D.diag)) but right hand side has $(size(V,1)) rows"))
     end
@@ -318,7 +318,7 @@ end
 (\)(D::Diagonal, b::AbstractVector) = D.diag .\ b
 (\)(Da::Diagonal, Db::Diagonal) = Diagonal(Da.diag .\ Db.diag)
 
-function inv{T}(D::Diagonal{T})
+function inv(D::Diagonal{T}) where T
     Di = similar(D.diag, typeof(inv(zero(T))))
     for i = 1:length(D.diag)
         if D.diag[i] == zero(T)
@@ -329,14 +329,14 @@ function inv{T}(D::Diagonal{T})
     Diagonal(Di)
 end
 
-function pinv{T}(D::Diagonal{T})
+function pinv(D::Diagonal{T}) where T
     Di = similar(D.diag, typeof(inv(zero(T))))
     for i = 1:length(D.diag)
         isfinite(inv(D.diag[i])) ? Di[i]=inv(D.diag[i]) : Di[i]=zero(T)
     end
     Diagonal(Di)
 end
-function pinv{T}(D::Diagonal{T}, tol::Real)
+function pinv(D::Diagonal{T}, tol::Real) where T
     Di = similar(D.diag, typeof(inv(zero(T))))
     if( !isempty(D.diag) ) maxabsD = maximum(abs.(D.diag)) end
     for i = 1:length(D.diag)

@@ -48,7 +48,7 @@ end
 Returns a shortened version of the name of `ref` that's
 "human-readable".
 
-```julia
+```julia-repl
 julia> repo = LibGit2.GitRepo(path_to_repo);
 
 julia> branch_ref = LibGit2.head(repo);
@@ -334,7 +334,7 @@ function Base.map(f::Function, bi::GitBranchIter)
     while !done(bi, s)
         val = f(s[1:2])
         if res === nothing
-            res = Array{typeof(val)}(0)
+            res = Vector{typeof(val)}(0)
         end
         push!(res, val)
         val, s = next(bi, s)

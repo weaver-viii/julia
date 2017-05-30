@@ -336,4 +336,36 @@ function vector_any(xs::ANY...)
     a
 end
 
+function as_kwargs(xs::Union{AbstractArray,Associative})
+    n = length(xs)
+    to = Vector{Any}(n*2)
+    i = 1
+    for (k, v) in xs
+        to[i]   = k::Symbol
+        to[i+1] = v
+        i += 2
+    end
+    return to
+end
+
+function as_kwargs(xs)
+    to = Vector{Any}(0)
+    for (k, v) in xs
+        ccall(:jl_array_ptr_1d_push2, Void, (Any, Any, Any), to, k::Symbol, v)
+    end
+    return to
+end
+
 isempty(itr) = done(itr, start(itr))
+
+"""
+    invokelatest(f, args...)
+
+Calls `f(args...)`, but guarantees that the most recent method of `f`
+will be executed.   This is useful in specialized circumstances,
+e.g. long-running event loops or callback functions that may
+call obsolete versions of a function `f`.
+(The drawback is that `invokelatest` is somewhat slower than calling
+`f` directly, and the type of the result cannot be inferred by the compiler.)
+"""
+invokelatest(f, args...) = Core._apply_latest(f, args)

@@ -92,11 +92,11 @@ end
     GitObject(repo::GitRepo, hash::AbstractGitHash)
     GitObject(repo::GitRepo, spec::AbstractString)
 
-Return the specified object (`GitCommit`, `GitBlob`, `GitTree` or `GitTag`) from `repo`
+Return the specified object ([`GitCommit`](@ref), [`GitBlob`](@ref), [`GitTree`](@ref) or [`GitTag`](@ref)) from `repo`
 specified by `hash`/`spec`.
 
 - `hash` is a full (`GitHash`) or partial (`GitShortHash`) hash.
-- `spec` is a textual specification: see https://git-scm.com/docs/git-rev-parse.html#_specifying_revisions for a full list.
+- `spec` is a textual specification: see [the git docs](https://git-scm.com/docs/git-rev-parse.html#_specifying_revisions) for a full list.
 """ GitObject
 
 for T in (:GitCommit, :GitBlob, :GitTree, :GitTag)
@@ -107,7 +107,7 @@ for T in (:GitCommit, :GitBlob, :GitTree, :GitTag)
 Return a `$T` object from `repo` specified by `hash`/`spec`.
 
 - `hash` is a full (`GitHash`) or partial (`GitShortHash`) hash.
-- `spec` is a textual specification: see https://git-scm.com/docs/git-rev-parse.html#_specifying_revisions for a full list.
+- `spec` is a textual specification: see [the git docs](https://git-scm.com/docs/git-rev-parse.html#_specifying_revisions) for a full list.
 """ $T
 end
 
@@ -155,7 +155,7 @@ Returns the location of the "git" files of `repo`:
  - for normal repositories, this is the location of the `.git` folder.
  - for bare repositories, this is the location of the repository itself.
 
-See also `workdir`, `path`
+See also [`workdir`](@ref), [`path`](@ref).
 """
 function gitdir(repo::GitRepo)
     return unsafe_string(ccall((:git_repository_path, :libgit2), Cstring,
@@ -174,7 +174,7 @@ repositories.
     some cases: e.g. if either the `core.worktree` configuration variable or the
     `GIT_WORK_TREE` environment variable is set.
 
-See also `gitdir`, `path`
+See also [`gitdir`](@ref), [`path`](@ref).
 """
 function workdir(repo::GitRepo)
     sptr = ccall((:git_repository_workdir, :libgit2), Cstring,
@@ -193,7 +193,7 @@ The base file path of the repository `repo`.
    more details).
  - for bare repositories, this is the location of the "git" files.
 
-See also `gitdir`, `workdir`.
+See also [`gitdir`](@ref), [`workdir`](@ref).
 """
 function path(repo::GitRepo)
     d = gitdir(repo)
@@ -217,7 +217,7 @@ then `obj` will be peeled until the type changes.
 - A `GitTag` will be peeled to the object it references.
 - A `GitCommit` will be peeled to a `GitTree`.
 """
-function peel{T<:GitObject}(::Type{T}, obj::GitObject)
+function peel(::Type{T}, obj::GitObject) where T<:GitObject
     new_ptr_ptr = Ref{Ptr{Void}}(C_NULL)
 
     @check ccall((:git_object_peel, :libgit2), Cint,
@@ -227,6 +227,69 @@ function peel{T<:GitObject}(::Type{T}, obj::GitObject)
 end
 peel(obj::GitObject) = peel(GitObject, obj)
 
+"""
+    LibGit2.GitDescribeResult(commitish::GitObject; kwarg...)
+
+Produce a `GitDescribeResult` of the `commitish` `GitObject`, which
+contains detailed information about it based on the keyword argument:
+
+  * `options::DescribeOptions=DescribeOptions()`
+
+Equivalent to `git describe <commitish>`.
+"""
+function GitDescribeResult(commitish::GitObject;
+                           options::DescribeOptions=DescribeOptions())
+    result_ptr_ptr = Ref{Ptr{Void}}(C_NULL)
+    @check ccall((:git_describe_commit, :libgit2), Cint,
+                 (Ptr{Ptr{Void}}, Ptr{Void}, Ptr{DescribeOptions}),
+                 result_ptr_ptr, commitish.ptr, Ref(options))
+    return GitDescribeResult(commitish.owner, result_ptr_ptr[])
+end
+
+"""
+    LibGit2.GitDescribeResult(repo::GitRepo; kwarg...)
+
+Produce a `GitDescribeResult` of the repository `repo`'s working directory,
+which can include all the commits and tags (or, for instance, HEAD only).
+The `GitDescribeResult` contains detailed information about the workdir based
+on the keyword argument:
+
+  * `options::DescribeOptions=DescribeOptions()`
+
+Equivalent to `git describe`.
+"""
+function GitDescribeResult(repo::GitRepo; options::DescribeOptions=DescribeOptions())
+    result_ptr_ptr = Ref{Ptr{Void}}(C_NULL)
+    @check ccall((:git_describe_workdir, :libgit2), Cint,
+                 (Ptr{Ptr{Void}}, Ptr{Void}, Ptr{DescribeOptions}),
+                 result_ptr_ptr, repo.ptr, Ref(options))
+    return GitDescribeResult(repo, result_ptr_ptr[])
+end
+
+"""
+    LibGit2.format(result::GitDescribeResult; kwarg...) -> String
+
+Produce a formatted string based on a `GitDescribeResult`.
+Formatting options are controlled by the keyword argument:
+
+  * `options::DescribeFormatOptions=DescribeFormatOptions()`
+"""
+function format(result::GitDescribeResult; options::DescribeFormatOptions=DescribeFormatOptions())
+    buf_ref = Ref(Buffer())
+    @check ccall((:git_describe_format, :libgit2), Cint,
+                 (Ptr{Buffer}, Ptr{Void}, Ptr{DescribeFormatOptions}),
+                 buf_ref, result.ptr, Ref(options))
+    buf = buf_ref[]
+    str = unsafe_string(buf.ptr, buf.size)
+    free(buf_ref)
+    return str
+end
+
+function Base.show(io::IO, result::GitDescribeResult)
+    fmt_desc = format(result)
+    println(io, "GitDescribeResult:")
+    println(io, fmt_desc)
+end
 
 function checkout_tree(repo::GitRepo, obj::GitObject;
                        options::CheckoutOptions = CheckoutOptions())

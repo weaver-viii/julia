@@ -235,7 +235,7 @@ julia> 5 <= 3
 false
 ```
 """
-<=(x, y) = !(y < x)
+<=(x, y) = (x < y) | (x == y)
 const ≤ = <=
 
 """
@@ -532,8 +532,8 @@ Unsigned right bit shift operator, `x >>> n`. For `n >= 0`, the result is `x`
 shifted right by `n` bits, where `n >= 0`, filling with `0`s. For `n < 0`, this
 is equivalent to `x << -n`.
 
-For `Unsigned` integer types, this is equivalent to [`>>`](@ref). For
-`Signed` integer types, this is equivalent to `signed(unsigned(x) >> n)`.
+For [`Unsigned`](@ref) integer types, this is equivalent to [`>>`](@ref). For
+[`Signed`](@ref) integer types, this is equivalent to `signed(unsigned(x) >> n)`.
 
 ```jldoctest
 julia> Int8(-14) >>> 2
@@ -545,7 +545,8 @@ julia> bits(Int8(-14))
 julia> bits(Int8(60))
 "00111100"
 ```
-`BigInt`s are treated as if having infinite size, so no filling is required and this
+
+[`BigInt`](@ref)s are treated as if having infinite size, so no filling is required and this
 is equivalent to [`>>`](@ref).
 
 See also [`>>`](@ref), [`<<`](@ref).
@@ -664,9 +665,9 @@ julia> x == (fld1(x, y) - 1) * y + mod1(x, y)
 true
 ```
 """
-fld1{T<:Real}(x::T, y::T) = (m=mod(x,y); fld(x-m,y))
+fld1(x::T, y::T) where {T<:Real} = (m=mod(x,y); fld(x-m,y))
 # efficient version for integers
-fld1{T<:Integer}(x::T, y::T) = fld(x+y-T(1),y)
+fld1(x::T, y::T) where {T<:Integer} = fld(x+y-T(1),y)
 
 """
     fldmod1(x, y)
@@ -675,9 +676,9 @@ Return `(fld1(x,y), mod1(x,y))`.
 
 See also: [`fld1`](@ref), [`mod1`](@ref).
 """
-fldmod1{T<:Real}(x::T, y::T) = (fld1(x,y), mod1(x,y))
+fldmod1(x::T, y::T) where {T<:Real} = (fld1(x,y), mod1(x,y))
 # efficient version for integers
-fldmod1{T<:Integer}(x::T, y::T) = (fld1(x,y), mod1(x,y))
+fldmod1(x::T, y::T) where {T<:Integer} = (fld1(x,y), mod1(x,y))
 
 # transpose
 

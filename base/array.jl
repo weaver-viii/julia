@@ -53,15 +53,27 @@ import Core: arraysize, arrayset, arrayref
     Array{T,N}(dims)
 
 Construct an uninitialized `N`-dimensional dense array with element type `T`,
-where `N` is determined from the length or number of `dims`.  `dims` may
+where `N` is determined from the length or number of `dims`. `dims` may
 be a tuple or a series of integer arguments corresponding to the lengths in each dimension.
 If the rank `N` is supplied explicitly as in `Array{T,N}(dims)`, then it must
 match the length or number of `dims`.
+
+# Example
+
+```jldoctest
+julia> A = Array{Float64, 2}(2, 2);
+
+julia> ndims(A)
+2
+
+julia> eltype(A)
+Float64
+```
 """
 Array
 
 vect() = Array{Any,1}(0)
-vect{T}(X::T...) = T[ X[i] for i=1:length(X) ]
+vect(X::T...) where {T} = T[ X[i] for i = 1:length(X) ]
 
 function vect(X...)
     T = promote_typeof(X...)
@@ -73,12 +85,7 @@ end
 size(a::Array, d) = arraysize(a, d)
 size(a::Vector) = (arraysize(a,1),)
 size(a::Matrix) = (arraysize(a,1), arraysize(a,2))
-size(a::Array) = (@_inline_meta; _size((), a))
-_size(out::NTuple{N}, A::Array{_,N}) where {_,N} = out
-function _size(out::NTuple{M}, A::Array{_,N}) where _ where M where N
-    @_inline_meta
-    _size((out..., size(A,M+1)), A)
-end
+size(a::Array{<:Any,N}) where {N} = (@_inline_meta; ntuple(M -> size(a, M), Val{N}))
 
 asize_from(a::Array, n) = n > ndims(a) ? () : (arraysize(a,n), asize_from(a, n+1)...)
 
@@ -259,7 +266,7 @@ end
     eye([T::Type=Float64,] m::Integer, n::Integer)
 
 `m`-by-`n` identity matrix.
-The default element type is `Float64`.
+The default element type is [`Float64`](@ref).
 """
 function eye(::Type{T}, m::Integer, n::Integer) where T
     a = zeros(T,m,n)
@@ -280,7 +287,7 @@ eye(::Type{T}, n::Integer) where {T} = eye(T, n, n)
     eye([T::Type=Float64,] n::Integer)
 
 `n`-by-`n` identity matrix.
-The default element type is `Float64`.
+The default element type is [`Float64`](@ref).
 """
 eye(n::Integer) = eye(Float64, n)
 
@@ -399,7 +406,7 @@ function _collect(cont, itr, ::HasEltype, isz::SizeUnknown)
     return a
 end
 
-_collect_indices(::Tuple{}, A) = copy!(Array{eltype(A)}(), A)
+_collect_indices(::Tuple{}, A) = copy!(Vector{eltype(A)}(), A)
 _collect_indices(indsA::Tuple{Vararg{OneTo}}, A) =
     copy!(Array{eltype(A)}(length.(indsA)), A)
 function _collect_indices(indsA, A)
@@ -706,7 +713,7 @@ julia> resize!([6, 5, 4, 3, 2, 1], 3)
  4
 ```
 
-```julia
+```julia-repl
 julia> resize!([6, 5, 4, 3, 2, 1], 8)
 8-element Array{Int64,1}:
  6
@@ -853,8 +860,8 @@ julia> deleteat!([6, 5, 4, 3, 2, 1], [true, false, true, false, true, false])
 julia> deleteat!([6, 5, 4, 3, 2, 1], (2, 2))
 ERROR: ArgumentError: indices must be unique and sorted
 Stacktrace:
- [1] _deleteat!(::Array{Int64,1}, ::Tuple{Int64,Int64}) at ./array.jl:873
- [2] deleteat!(::Array{Int64,1}, ::Tuple{Int64,Int64}) at ./array.jl:860
+ [1] _deleteat!(::Array{Int64,1}, ::Tuple{Int64,Int64}) at ./array.jl:880
+ [2] deleteat!(::Array{Int64,1}, ::Tuple{Int64,Int64}) at ./array.jl:867
 ```
 """
 deleteat!(a::Vector, inds) = _deleteat!(a, inds)
@@ -1725,6 +1732,57 @@ function indexin(a::AbstractArray, b::AbstractArray)
     [get(bdict, i, 0) for i in a]
 end
 
+function _findin(a, b)
+    ind  = Int[]
+    bset = Set(b)
+    @inbounds for (i,ai) in enumerate(a)
+        ai in bset && push!(ind, i)
+    end
+    ind
+end
+
+# If two collections are already sorted, findin can be computed with
+# a single traversal of the two collections. This is much faster than
+# using a hash table (although it has the same complexity).
+function _sortedfindin(v, w)
+    viter, witer = eachindex(v), eachindex(w)
+    out  = eltype(viter)[]
+    i, j = start(viter), start(witer)
+    if done(viter, i) || done(witer, j)
+        return out
+    end
+    viteri, i = next(viter, i)
+    witerj, j = next(witer, j)
+    @inbounds begin
+        vi, wj = v[viteri], w[witerj]
+        while true
+            if isless(vi, wj)
+                if done(viter, i)
+                    break
+                end
+                viteri, i = next(viter, i)
+                vi        = v[viteri]
+            elseif isless(wj, vi)
+                if done(witer, j)
+                    break
+                end
+                witerj, j = next(witer, j)
+                wj        = w[witerj]
+            else
+                push!(out, viteri)
+                if done(viter, i)
+                    break
+                end
+                # We only increment the v iterator because v can have
+                # repeated matches to a single value in w
+                viteri, i = next(viter, i)
+                vi        = v[viteri]
+            end
+        end
+    end
+    return out
+end
+
 """
     findin(a, b)
 
@@ -1750,14 +1808,16 @@ julia> findin(a,b) # 10 is the only common element
  4
 ```
 """
-function findin(a, b)
-    ind = Array{Int,1}(0)
-    bset = Set(b)
-    @inbounds for (i,ai) in enumerate(a)
-        ai in bset && push!(ind, i)
+function findin(a::Array{<:Real}, b::Union{Array{<:Real},Real})
+    if issorted(a, Sort.Forward) && issorted(b, Sort.Forward)
+        return _sortedfindin(a, b)
+    else
+        return _findin(a, b)
     end
-    ind
 end
+# issorted fails for some element types so the method above has to be restricted
+# to element with isless/< defined.
+findin(a, b) = _findin(a, b)
 
 # Copying subregions
 # TODO: DEPRECATE FOR #14770
@@ -1806,20 +1866,27 @@ julia> filter(isodd, a)
 """
 filter(f, As::AbstractArray) = As[map(f, As)::AbstractArray{Bool}]
 
-function filter!(f, a::Vector)
-    insrt = 1
+function filter!(f, a::AbstractVector)
+    isempty(a) && return a
+
+    idx = eachindex(a)
+    state = start(idx)
+    i, state = next(idx, state)
+
     for acurr in a
         if f(acurr)
-            a[insrt] = acurr
-            insrt += 1
+            a[i] = acurr
+            i, state = next(idx, state)
         end
     end
-    deleteat!(a, insrt:length(a))
+
+    deleteat!(a, i:last(idx))
+
     return a
 end
 
 function filter(f, a::Vector)
-    r = Array{eltype(a)}(0)
+    r = Vector{eltype(a)}(0)
     for ai in a
         if f(ai)
             push!(r, ai)
@@ -1832,7 +1899,7 @@ end
 # These are moderately efficient, preserve order, and remove dupes.
 
 function intersect(v1, vs...)
-    ret = Array{promote_eltype(v1, vs...)}(0)
+    ret = Vector{promote_eltype(v1, vs...)}(0)
     for v_elem in v1
         inall = true
         for vsi in vs
@@ -1848,7 +1915,7 @@ function intersect(v1, vs...)
 end
 
 function union(vs...)
-    ret = Array{promote_eltype(vs...)}(0)
+    ret = Vector{promote_eltype(vs...)}(0)
     seen = Set()
     for v in vs
         for v_elem in v

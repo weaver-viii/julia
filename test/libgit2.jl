@@ -6,6 +6,37 @@ import TestHelpers: challenge_prompt
 const LIBGIT2_MIN_VER = v"0.23.0"
 const LIBGIT2_HELPER_PATH = joinpath(dirname(@__FILE__), "libgit2-helpers.jl")
 
+function get_global_dir()
+    buf = Ref(LibGit2.Buffer())
+    LibGit2.@check ccall((:git_libgit2_opts, :libgit2), Cint,
+                         (Cint, Cint, Ptr{LibGit2.Buffer}),
+                         LibGit2.Consts.GET_SEARCH_PATH, LibGit2.Consts.CONFIG_LEVEL_GLOBAL, buf)
+    path = unsafe_string(buf[].ptr)
+    LibGit2.free(buf)
+    return path
+end
+
+function set_global_dir(dir)
+    LibGit2.@check ccall((:git_libgit2_opts, :libgit2), Cint,
+                         (Cint, Cint, Cstring),
+                         LibGit2.Consts.SET_SEARCH_PATH, LibGit2.Consts.CONFIG_LEVEL_GLOBAL, dir)
+    return
+end
+
+function with_libgit2_temp_home(f)
+    mktempdir() do tmphome
+        oldpath = get_global_dir()
+        set_global_dir(tmphome)
+        try
+            @test get_global_dir() == tmphome
+            f(tmphome)
+        finally
+            set_global_dir(oldpath)
+        end
+        return
+    end
+end
+
 #########
 # TESTS #
 #########
@@ -59,11 +90,27 @@ end
 end
 
 @testset "Default config" begin
-    #for now just see that this works
-    cfg = LibGit2.GitConfig()
-    @test isa(cfg, LibGit2.GitConfig)
-    LibGit2.set!(cfg, "fake.property", "AAAA")
-    LibGit2.getconfig("fake.property", "") == "AAAA"
+    with_libgit2_temp_home() do tmphome
+        cfg = LibGit2.GitConfig()
+        @test isa(cfg, LibGit2.GitConfig)
+        @test LibGit2.getconfig("fake.property", "") == ""
+        LibGit2.set!(cfg, "fake.property", "AAAA")
+        @test LibGit2.getconfig("fake.property", "") == "AAAA"
+    end
+end
+
+# See #21872 and #21636
+LibGit2.version() >= v"0.26.0" && is_unix() && @testset "Default config with symlink" begin
+    with_libgit2_temp_home() do tmphome
+        write(joinpath(tmphome, "real_gitconfig"), "[fake]\n\tproperty = BBB")
+        symlink(joinpath(tmphome, "real_gitconfig"),
+                joinpath(tmphome, ".gitconfig"))
+        cfg = LibGit2.GitConfig()
+        @test isa(cfg, LibGit2.GitConfig)
+        LibGit2.getconfig("fake.property", "") == "BBB"
+        LibGit2.set!(cfg, "fake.property", "AAAA")
+        LibGit2.getconfig("fake.property", "") == "AAAA"
+    end
 end
 
 @testset "Git URL parsing" begin
@@ -393,7 +440,6 @@ mktempdir() do dir
                     @test contains(showstr[4], "SHA:")
                     @test showstr[5] == "Message:"
                     @test showstr[6] == commit_msg1
-
                     @test LibGit2.revcount(repo, string(commit_oid1), string(commit_oid3)) == (-1,0)
                 finally
                     close(cmt)
@@ -513,6 +559,15 @@ mktempdir() do dir
                 @test length(tags) == 1
                 @test tag2 ∈ tags
                 @test tag1 ∉ tags
+
+                description = LibGit2.GitDescribeResult(repo)
+                fmtted_description = LibGit2.format(description)
+                @test sprint(show, description) == "GitDescribeResult:\n$fmtted_description\n"
+                @test fmtted_description == "tag2"
+                description = LibGit2.GitDescribeResult(LibGit2.GitObject(repo, "HEAD"))
+                fmtted_description = LibGit2.format(description)
+                @test sprint(show, description) == "GitDescribeResult:\n$fmtted_description\n"
+                @test fmtted_description == "tag2"
             finally
                 close(repo)
             end
@@ -685,6 +740,46 @@ mktempdir() do dir
             # ff merge them
             @test LibGit2.merge!(repo, [upst_ann], true)
             @test LibGit2.is_ancestor_of(string(oldhead), string(LibGit2.head_oid(repo)), repo)
+
+            oldhead = LibGit2.head_oid(repo)
+            LibGit2.branch!(repo, "branch/ff_b")
+            open(joinpath(LibGit2.path(repo),"ff_file3"),"w") do f
+                write(f, "333\n")
+            end
+            LibGit2.add!(repo, "ff_file3")
+            LibGit2.commit(repo, "add ff_file3")
+
+            open(joinpath(LibGit2.path(repo),"ff_file4"),"w") do f
+                write(f, "444\n")
+            end
+            LibGit2.add!(repo, "ff_file4")
+            LibGit2.commit(repo, "add ff_file4")
+            branchhead = LibGit2.head_oid(repo)
+            LibGit2.branch!(repo, "master")
+            # switch back, now try to ff-merge the changes
+            # from branch/a using committish
+            @test LibGit2.merge!(repo, committish=string(branchhead))
+            @test LibGit2.is_ancestor_of(string(oldhead), string(LibGit2.head_oid(repo)), repo)
+
+            oldhead = LibGit2.head_oid(repo)
+            LibGit2.branch!(repo, "branch/ff_c")
+            open(joinpath(LibGit2.path(repo),"ff_file5"),"w") do f
+                write(f, "555\n")
+            end
+            LibGit2.add!(repo, "ff_file5")
+            LibGit2.commit(repo, "add ff_file5")
+
+            open(joinpath(LibGit2.path(repo),"ff_file6"),"w") do f
+                write(f, "666\n")
+            end
+            LibGit2.add!(repo, "ff_file6")
+            LibGit2.commit(repo, "add ff_file6")
+            branchhead = LibGit2.head_oid(repo)
+            LibGit2.branch!(repo, "master")
+            # switch back, now try to ff-merge the changes
+            # from branch/ff_c using branch name
+            @test LibGit2.merge!(repo, branch="refs/heads/branch/ff_c")
+            @test LibGit2.is_ancestor_of(string(oldhead), string(LibGit2.head_oid(repo)), repo)
         finally
             close(repo)
         end
@@ -729,9 +824,9 @@ mktempdir() do dir
             head_ann = LibGit2.GitAnnotated(repo, "master")
 
             # (fail to) merge them because we can't fastforward
-            @test !LibGit2.merge!(repo, [upst_ann], true)
+            @test_warn "WARNING: Cannot perform fast-forward merge." !LibGit2.merge!(repo, [upst_ann], true)
             # merge them now that we allow non-ff
-            @test LibGit2.merge!(repo, [upst_ann], false)
+            @test_warn "INFO: Review and commit merged changes." LibGit2.merge!(repo, [upst_ann], false)
             @test LibGit2.is_ancestor_of(string(oldhead), string(LibGit2.head_oid(repo)), repo)
 
             # go back to merge_a and rename a file
@@ -744,9 +839,37 @@ mktempdir() do dir
             rename_flag = 0
             rename_flag = LibGit2.toggle(rename_flag, 0) # turns on the find renames opt
             mos = LibGit2.MergeOptions(flags=rename_flag)
-            @test LibGit2.merge!(repo, [upst_ann], merge_opts=mos)
+            @test_warn "INFO: Review and commit merged changes." LibGit2.merge!(repo, [upst_ann], merge_opts=mos)
         finally
             close(repo)
+        end
+    end
+
+    @testset "push" begin
+        up_path = joinpath(dir, "Example.PushUp")
+        up_repo = LibGit2.clone(cache_repo, up_path)
+        our_path = joinpath(dir, "Example.Push")
+        our_repo = LibGit2.clone(cache_repo, our_path)
+        # need to set this for merges to succeed
+        our_cfg = LibGit2.GitConfig(our_repo)
+        LibGit2.set!(our_cfg, "user.name", "AAAA")
+        LibGit2.set!(our_cfg, "user.email", "BBBB@BBBB.COM")
+        up_cfg = LibGit2.GitConfig(up_repo)
+        LibGit2.set!(up_cfg, "user.name", "AAAA")
+        LibGit2.set!(up_cfg, "user.email", "BBBB@BBBB.COM")
+        try
+            open(joinpath(LibGit2.path(our_repo),"file1"),"w") do f
+                write(f, "111\n")
+            end
+            LibGit2.add!(our_repo, "file1")
+            LibGit2.commit(our_repo, "add file1")
+            if LibGit2.version() >= v"0.26.0" # See #21872, #21639 and #21597
+                # we cannot yet locally push to non-bare repos
+                @test_throws LibGit2.GitError LibGit2.push(our_repo, remoteurl=up_path)
+            end
+        finally
+            close(our_repo)
+            close(up_repo)
         end
     end
 
@@ -766,6 +889,10 @@ mktempdir() do dir
             @test isfile(joinpath(test_repo, test_file))
             @test new_head == head_oid
 
+            # GitAnnotated for a fetchhead
+            fh_ann = LibGit2.GitAnnotated(repo, LibGit2.Consts.FETCH_HEAD)
+            @test LibGit2.GitHash(fh_ann) == head_oid
+
             # Detach HEAD - no merge
             LibGit2.checkout!(repo, string(commit_oid3))
             @test_throws LibGit2.Error.GitError LibGit2.merge!(repo, fastforward=true)
@@ -779,6 +906,10 @@ mktempdir() do dir
             LibGit2.set!(cfg, "user.name", "AAAA")
             LibGit2.set!(cfg, "user.email", "BBBB@BBBB.COM")
 
+            # If upstream argument is empty, libgit2 will look for tracking
+            # information. If the current branch isn't tracking any upstream
+            # the rebase should fail.
+            @test_throws LibGit2.GitError LibGit2.rebase!(repo)
             # Try rebasing on master instead
             newhead = LibGit2.rebase!(repo, master_branch)
             @test newhead == head_oid
@@ -1053,7 +1184,7 @@ mktempdir() do dir
             LibGit2.commit(repo, "add merge_file1")
             LibGit2.branch!(repo, "master")
             a_head_ann = LibGit2.GitAnnotated(repo, "branch/merge_a")
-            @test LibGit2.merge!(repo, [a_head_ann]) #merge returns true if successful
+            @test_warn "INFO: Review and commit merged changes." LibGit2.merge!(repo, [a_head_ann]) #merge returns true if successful
         finally
             close(repo)
         end
@@ -1129,6 +1260,11 @@ mktempdir() do dir
         @test LibGit2.checkused!(creds)
         @test creds.user == creds_user
         @test creds.pass == creds_pass
+        sshcreds = LibGit2.SSHCredentials(creds_user, creds_pass)
+        @test sshcreds.user == creds_user
+        @test sshcreds.pass == creds_pass
+        @test isempty(sshcreds.prvkey)
+        @test isempty(sshcreds.pubkey)
     end
 
     # The following tests require that we can fake a TTY so that we can provide passwords

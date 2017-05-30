@@ -27,9 +27,9 @@ mutable struct Channel{T} <: AbstractChannel
     sz_max::Int            # maximum size of channel
 
     # Used when sz_max == 0, i.e., an unbuffered channel.
+    waiters::Int
     takers::Vector{Task}
     putters::Vector{Task}
-    waiters::Int
 
     function Channel{T}(sz::Float64) where T
         if sz == Inf
@@ -42,7 +42,12 @@ mutable struct Channel{T} <: AbstractChannel
         if sz < 0
             throw(ArgumentError("Channel size must be either 0, a positive integer or Inf"))
         end
-        new(Condition(), Condition(), :open, Nullable{Exception}(), Vector{T}(0), sz, Vector{Task}(0), Vector{Task}(0), 0)
+        ch = new(Condition(), Condition(), :open, Nullable{Exception}(), Vector{T}(0), sz, 0)
+        if sz == 0
+            ch.takers = Vector{Task}(0)
+            ch.putters = Vector{Task}(0)
+        end
+        return ch
     end
 
     # deprecated empty constructor
@@ -189,8 +194,8 @@ julia> take!(c)
 julia> put!(c,1);
 ERROR: foo
 Stacktrace:
- [1] check_channel_state(::Channel{Any}) at ./channels.jl:127
- [2] put!(::Channel{Any}, ::Int64) at ./channels.jl:258
+ [1] check_channel_state(::Channel{Any}) at ./channels.jl:131
+ [2] put!(::Channel{Any}, ::Int64) at ./channels.jl:261
 ```
 """
 function bind(c::Channel, task::Task)
@@ -376,8 +381,10 @@ function notify_error(c::Channel, err)
     notify_error(c.cond_put, err)
 
     # release tasks on a `wait()/yieldto()` call (on unbuffered channels)
-    waiters = filter!(t->(t.state == :runnable), vcat(c.takers, c.putters))
-    foreach(t->schedule(t, err; error=true), waiters)
+    if !isbuffered(c)
+        waiters = filter!(t->(t.state == :runnable), vcat(c.takers, c.putters))
+        foreach(t->schedule(t, err; error=true), waiters)
+    end
 end
 notify_error(c::Channel) = notify_error(c, get(c.excp))
 

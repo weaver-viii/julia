@@ -219,8 +219,8 @@ isstructtype(x) = (@_pure_meta; false)
     isbits(T)
 
 Return `true` if `T` is a "plain data" type, meaning it is immutable and contains no
-references to other values. Typical examples are numeric types such as `UInt8`, `Float64`,
-and `Complex{Float64}`.
+references to other values. Typical examples are numeric types such as [`UInt8`](@ref),
+[`Float64`](@ref), and [`Complex{Float64}`](@ref).
 
 ```jldoctest
 julia> isbits(Complex{Float64})
@@ -340,7 +340,7 @@ fieldoffset(x::DataType, idx::Integer) = (@_pure_meta; ccall(:jl_get_field_offse
 Determine the declared type of a field (specified by name or index) in a composite DataType `T`.
 
 ```jldoctest
-julia> immutable Foo
+julia> struct Foo
            x::Int64
            y::String
        end
@@ -361,7 +361,7 @@ Get the index of a named field, throwing an error if the field does not exist (w
 or returning 0 (when err==false).
 
 ```jldoctest
-julia> immutable Foo
+julia> struct Foo
            x::Int64
            y::String
        end

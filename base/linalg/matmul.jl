@@ -7,7 +7,6 @@ matprod(x, y) = x*y + x*y
 # multiply by diagonal matrix as vector
 function scale!(C::AbstractMatrix, A::AbstractMatrix, b::AbstractVector)
     m, n = size(A)
-    p, q = size(C)
     if size(A) != size(C)
         throw(DimensionMismatch("size of A, $(size(A)), does not match size of C, $(size(C))"))
     end
@@ -25,7 +24,6 @@ end
 
 function scale!(C::AbstractMatrix, b::AbstractVector, A::AbstractMatrix)
     m, n = size(A)
-    p, q = size(C)
     if size(A) != size(C)
         throw(DimensionMismatch("size of A, $(size(A)), does not match size of C, $(size(C))"))
     end
@@ -320,7 +318,7 @@ function herk_wrapper!(C::Union{StridedMatrix{T}, StridedMatrix{Complex{T}}}, tA
     end
 
     # Result array does not need to be initialized as long as beta==0
-    #    C = Array{T}(mA, mA)
+    #    C = Matrix{T}(mA, mA)
 
     if stride(A, 1) == stride(C, 1) == 1 && stride(A, 2) >= size(A, 1) && stride(C, 2) >= size(C, 1)
         return copytri!(BLAS.herk!('U', tA, one(T), A, zero(T), C), 'U', true)

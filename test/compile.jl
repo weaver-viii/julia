@@ -411,6 +411,107 @@ let dir = mktempdir(),
     end
 end
 
+# test loading a package with conflicting namespace
+let dir = mktempdir()
+    Test_module = :Test6c92f26
+    try
+        write(joinpath(dir, "Iterators.jl"),
+              """
+              module Iterators
+                   __precompile__(true)
+              end
+              """)
+
+        write(joinpath(dir, "$Test_module.jl"),
+              """
+              module $Test_module
+                   __precompile__(true)
+                   using Iterators
+              end
+              """)
+
+        testcode = """
+            insert!(LOAD_PATH, 1, $(repr(dir)))
+            insert!(Base.LOAD_CACHE_PATH, 1, $(repr(dir)))
+            using $Test_module
+        """
+
+        exename = `$(Base.julia_cmd()) --startup-file=no`
+        let fname = tempname()
+            try
+                @test readchomp(pipeline(`$exename -E $(testcode)`, stderr=fname)) == "nothing"
+                @test Test.ismatch_warn("WARNING: replacing module $Test_module.\n", readstring(fname))
+            finally
+                rm(fname, force=true)
+            end
+        end
+        # Loading $Test_module from the cache should not bring `Base.Iterators`
+        # into `Main`, since that would lead to a namespace conflict with
+        # the module `Iterators` defined above.
+        let fname = tempname()
+            try
+                @test readchomp(pipeline(`$exename -E $(testcode)`, stderr=fname)) == "nothing"
+                # e.g `@test_nowarn`
+                @test Test.ismatch_warn(r"^(?!.)"s, readstring(fname))
+            finally
+                rm(fname, force=true)
+            end
+        end
+    finally
+        rm(dir, recursive=true)
+    end
+end
+
+let dir = mktempdir()
+    try
+        insert!(LOAD_PATH, 1, dir)
+        insert!(Base.LOAD_CACHE_PATH, 1, dir)
+
+        loaded_modules = Channel{Symbol}(32)
+        callback = (mod::Symbol) -> put!(loaded_modules, mod)
+        push!(Base.package_callbacks, callback)
+
+        Test1_module = :Teste4095a81
+        Test2_module = :Teste4095a82
+        Test3_module = :Teste4095a83
+
+        write(joinpath(dir, "$(Test1_module).jl"),
+              """
+              module $(Test1_module)
+                  __precompile__(true)
+              end
+              """)
+
+        Base.compilecache("$(Test1_module)")
+        write(joinpath(dir, "$(Test2_module).jl"),
+              """
+              module $(Test2_module)
+                  __precompile__(true)
+                  using $(Test1_module)
+              end
+              """)
+        Base.compilecache("$(Test2_module)")
+        @test !Base.isbindingresolved(Main, Test2_module)
+        Base.require(Test2_module)
+        @test Base.isbindingresolved(Main, Test2_module)
+        @test take!(loaded_modules) == Test1_module
+        @test take!(loaded_modules) == Test2_module
+        write(joinpath(dir, "$(Test3_module).jl"),
+              """
+              module $(Test3_module)
+                  using $(Test3_module)
+              end
+              """)
+        Base.require(Test3_module)
+        @test take!(loaded_modules) == Test3_module
+    finally
+        pop!(Base.package_callbacks)
+        splice!(Base.LOAD_CACHE_PATH, 1)
+        splice!(LOAD_PATH, 1)
+        rm(dir, recursive=true)
+    end
+end
+
 let module_name = string("a",randstring())
     insert!(LOAD_PATH, 1, pwd())
     file_name = string(module_name, ".jl")
@@ -421,6 +522,57 @@ let module_name = string("a",randstring())
     @test isa(eval(Main, Symbol(module_name)), Module)
     deleteat!(LOAD_PATH,1)
     rm(file_name)
+end
+
+# Issue #19960
+let
+    # ideally this would test with workers on a remote host that does not have access to the master node filesystem for loading
+    # can simulate this for local workers by using relative load paths on master node that are not valid on workers
+    # so addprocs before changing directory to temp directory, otherwise workers will inherit temp working directory
+
+    test_workers = addprocs(1)
+    temp_path = mktempdir()
+    save_cwd = pwd()
+    cd(temp_path)
+    load_path = mktempdir(temp_path)
+    load_cache_path = mktempdir(temp_path)
+    unshift!(LOAD_PATH, basename(load_path))
+    unshift!(Base.LOAD_CACHE_PATH, basename(load_cache_path))
+
+    ModuleA = :Issue19960A
+    ModuleB = :Issue19960B
+
+    write(joinpath(load_path, "$ModuleA.jl"),
+        """
+        __precompile__(true)
+        module $ModuleA
+            export f
+            f() = myid()
+        end
+        """)
+
+    write(joinpath(load_path, "$ModuleB.jl"),
+        """
+        __precompile__(true)
+        module $ModuleB
+            using $ModuleA
+            export g
+            g() = f()
+        end
+        """)
+
+    try
+        @eval using $ModuleB
+        for wid in test_workers
+            @test remotecall_fetch(g, wid) == wid
+        end
+    finally
+        shift!(LOAD_PATH)
+        shift!(Base.LOAD_CACHE_PATH)
+        cd(save_cwd)
+        rm(temp_path, recursive=true)
+        rmprocs(test_workers)
+    end
 end
 
 end # !withenv

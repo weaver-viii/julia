@@ -190,8 +190,8 @@ _default_type(::Type{Number}) = Int
 """
     factorial(n)
 
-Factorial of `n`.  If `n` is an `Integer`, the factorial is computed as an
-integer (promoted to at least 64 bits).  Note that this may overflow if `n` is not small,
+Factorial of `n`. If `n` is an [`Integer`](@ref), the factorial is computed as an
+integer (promoted to at least 64 bits). Note that this may overflow if `n` is not small,
 but you can use `factorial(big(n))` to compute the result exactly in arbitrary precision.
 If `n` is not an `Integer`, `factorial(n)` is equivalent to [`gamma(n+1)`](@ref).
 
@@ -211,3 +211,22 @@ julia> factorial(big(21))
 ```
 """
 factorial(x::Number) = gamma(x + 1) # fallback for x not Integer
+
+"""
+    big(T::Type)
+
+Compute the type that represents the numeric type `T` with arbitrary precision.
+Equivalent to `typeof(big(zero(T)))`.
+
+```jldoctest
+julia> big(Rational)
+Rational{BigInt}
+
+julia> big(Float64)
+BigFloat
+
+julia> big(Complex{Int})
+Complex{BigInt}
+```
+"""
+big(::Type{T}) where {T<:Number} = typeof(big(zero(T)))

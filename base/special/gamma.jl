@@ -37,7 +37,7 @@ lfact(x::Integer) = x < 0 ? throw(DomainError()) : lgamma(x + oneunit(x))
     lgamma(x)
 
 Compute the logarithm of the absolute value of [`gamma`](@ref) for
-`Real` `x`, while for `Complex` `x` it computes the
+[`Real`](@ref) `x`, while for [`Complex`](@ref) `x` compute the
 principal branch cut of the logarithm of `gamma(x)` (defined for negative `real(x)`
 by analytic continuation from positive `real(x)`).
 """
@@ -131,8 +131,8 @@ function lgamma(z::Complex{Float64})
     end
     return lgamma_asymptotic(Complex(x,y)) - shift
 end
-lgamma{T<:Union{Integer,Rational}}(z::Complex{T}) = lgamma(float(z))
-lgamma{T<:Union{Float32,Float16}}(z::Complex{T}) = Complex{T}(lgamma(Complex{Float64}(z)))
+lgamma(z::Complex{T}) where {T<:Union{Integer,Rational}} = lgamma(float(z))
+lgamma(z::Complex{T}) where {T<:Union{Float32,Float16}} = Complex{T}(lgamma(Complex{Float64}(z)))
 
 gamma(z::Complex) = exp(lgamma(z))
 

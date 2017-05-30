@@ -2,6 +2,11 @@
 
 ## general machinery for irrational mathematical constants
 
+"""
+    Irrational <: Real
+
+Irrational number type.
+"""
 struct Irrational{sym} <: Real end
 
 show(io::IO, x::Irrational{sym}) where {sym} = print(io, "$sym = $(string(float(x))[1:15])...")
@@ -36,6 +41,8 @@ convert(::Type{Rational{BigInt}}, x::Irrational) = throw(ArgumentError("Cannot c
         T(BigFloat(x), r)
     end
 end
+
+float(::Type{<:Irrational}) = Float64
 
 ==(::Irrational{s}, ::Irrational{s}) where {s} = true
 ==(::Irrational, ::Irrational) = false
@@ -95,6 +102,8 @@ end
 <=(x::Rational, y::Irrational) = x < y
 
 isfinite(::Irrational) = true
+isinteger(::Irrational) = false
+iszero(::Irrational) = false
 
 hash(x::Irrational, h::UInt) = 3*object_id(x) - h
 
@@ -130,6 +139,7 @@ macro irrational(sym, val, def)
 end
 
 big(x::Irrational) = convert(BigFloat,x)
+big(::Type{<:Irrational}) = BigFloat
 
 ## specific irrational mathematical constants
 
@@ -151,7 +161,7 @@ julia> pi
 π = 3.1415926535897...
 ```
 """
-const pi = π
+π, const pi = π
 
 """
     e
@@ -164,7 +174,7 @@ julia> e
 e = 2.7182818284590...
 ```
 """
-const eu = e
+e, const eu = e
 
 """
     γ
@@ -177,7 +187,7 @@ julia> eulergamma
 γ = 0.5772156649015...
 ```
 """
-const eulergamma = γ
+γ, const eulergamma = γ
 
 """
     φ
@@ -190,7 +200,7 @@ julia> golden
 φ = 1.6180339887498...
 ```
 """
-const golden = φ
+φ, const golden = φ
 
 """
     catalan
