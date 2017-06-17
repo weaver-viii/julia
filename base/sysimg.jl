@@ -405,10 +405,6 @@ import .Dates: Date, DateTime, DateFormat, @dateformat_str, now
 include("sparse/sparse.jl")
 using .SparseArrays
 
-# algorithms
-include("algorithms.jl")
-importall .Algorithms
-
 include("asyncmap.jl")
 
 include("distributed/Distributed.jl")
