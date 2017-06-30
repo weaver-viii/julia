@@ -1855,6 +1855,9 @@ end
 # also remove deprecation warnings in find* functions in array.jl, sparse/sparsematrix.jl,
 # and sparse/sparsevector.jl.
 
+# Issue #22611
+@deprecate_moved RevString "LegacyStrings"
+
 # END 0.7 deprecations
 
 # BEGIN 1.0 deprecations

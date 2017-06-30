@@ -90,7 +90,6 @@ export
     Rational,
     Regex,
     RegexMatch,
-    RevString,
     RoundFromZero,
     RoundDown,
     RoundingMode,

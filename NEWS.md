@@ -115,6 +115,9 @@ Language changes
   * The keyword `importall` is deprecated. Use `using` and/or individual `import` statements
     instead ([#22789]).
 
+  * The `RevString` type for lazily reversed strings has been moved to the LegacyStrings
+    package ([#22611]).
+
 Breaking changes
 ----------------
 
@@ -242,6 +245,9 @@ This section lists changes that do not have deprecation warnings.
 
   * All command line arguments passed via `-e`, `-E`, and `-L` will be executed in the order
     given on the command line ([#23665]).
+
+  * `reverse(::AbstractString)` now unconditionally returns a `String`. Previously it
+    returned a `RepString`, which has been removed from Base ([#23612]).
 
 Library improvements
 --------------------
@@ -1358,6 +1364,7 @@ Command-line option changes
 [#22532]: https://github.com/JuliaLang/julia/issues/22532
 [#22588]: https://github.com/JuliaLang/julia/issues/22588
 [#22605]: https://github.com/JuliaLang/julia/issues/22605
+[#22611]: https://github.com/JuliaLang/julia/issues/22611
 [#22666]: https://github.com/JuliaLang/julia/issues/22666
 [#22696]: https://github.com/JuliaLang/julia/issues/22696
 [#22703]: https://github.com/JuliaLang/julia/issues/22703
@@ -1387,3 +1394,4 @@ Command-line option changes
 [#23233]: https://github.com/JuliaLang/julia/issues/23233
 [#23342]: https://github.com/JuliaLang/julia/issues/23342
 [#23404]: https://github.com/JuliaLang/julia/issues/23404
+[#23612]: https://github.com/JuliaLang/julia/issues/23612
