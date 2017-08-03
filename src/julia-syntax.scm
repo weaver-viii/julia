@@ -1678,9 +1678,9 @@
 (define (expand-for while lhs X body)
   ;; (for (= lhs X) body)
   (let* ((coll   (make-ssavalue))
-	 (state  (gensy))
-	 (outer? (and (pair? lhs) (eq? (car lhs) 'outer)))
-	 (lhs    (if outer? (cadr lhs) lhs)))
+         (state  (gensy))
+         (outer? (and (pair? lhs) (eq? (car lhs) 'outer)))
+         (lhs    (if outer? (cadr lhs) lhs)))
     `(block (= ,coll ,(expand-forms X))
             (= ,state (call (top start) ,coll))
             ;; TODO avoid `local declared twice` error from this
@@ -1698,6 +1698,34 @@
                   ,(lower-tuple-assignment (list lhs state)
                                            `(call (top next) ,coll ,state))
                   ,body)))))))
+
+(define (expand-for while lhs X body)
+  ;; (for (= lhs X) body)
+  (let* ((coll   (make-ssavalue))
+         (state  (make-ssavalue))
+         (next   (gensy))
+         (outer? (and (pair? lhs) (eq? (car lhs) 'outer)))
+         (lhs    (if outer? (cadr lhs) lhs))
+         (test   `(call (|.| (core Intrinsics) 'not_int) (call (core ===) ,next (null))))
+         (cont   `(block
+                   (= ,state (call (core getfield) ,next 2))
+                   (= ,next (call (top iterate) ,coll ,state))))
+         (body   `(block
+                   ,@(if (and (not outer?) (or *depwarn* *deperror*))
+                         (map (lambda (v) `(warn-if-existing ,v)) (lhs-vars lhs))
+                         '())
+                   (= ,lhs (call (core getfield) ,next 1))
+                   ,body)))
+    `(block (= ,coll ,(expand-forms X))
+            (= ,next (call (top iterate) ,coll))
+            (scope-block
+             (break-block loop-exit
+               (_while
+                 ,(expand-forms test)
+                 (block (break-block loop-cont
+                                     ,(expand-forms body))
+                        ,(expand-forms cont))))))))
+
 
 ;; convert an operator parsed as (op a b) to (call op a b)
 (define (syntactic-op-to-call e)
@@ -2563,9 +2591,9 @@
         ((eq? (car e) 'local-def) '(null)) ;; remove local decls
         ((eq? (car e) 'implicit-global) '(null)) ;; remove implicit-global decls
         ((eq? (car e) 'warn-if-existing)
-	 (if (or (memq (cadr e) outerglobals) (memq (cadr e) implicitglobals))
-	     `(warn-loop-var ,(cadr e))
-	     '(null)))
+         (if (or (memq (cadr e) outerglobals) (memq (cadr e) implicitglobals))
+             `(warn-loop-var ,(cadr e))
+             '(null)))
         ((eq? (car e) 'lambda)
          (let* ((lv (lam:vars e))
                 (env (append lv env))
