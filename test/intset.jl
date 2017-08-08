@@ -187,7 +187,7 @@ end
     @test intersect(IntSet([1,2,3])) == IntSet([1,2,3])
     @test intersect(IntSet(1:7), IntSet(3:10)) ==
     	  intersect(IntSet(3:10), IntSet(1:7)) == IntSet(3:7)
-    @test intersect(IntSet(1:10), IntSet(1:4), 1:5, [2,3,10]) == [2,3]
+    @test intersect(IntSet(1:10), IntSet(1:4), 1:5, [2,3,10]) == IntSet([2,3])
 end
 
 @testset "setdiff, symdiff" begin

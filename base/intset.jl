@@ -110,67 +110,29 @@ isempty(s::IntSet) = !any(s.bits)
 
 # Mathematical set functions: union!, intersect!, setdiff!, symdiff!
 
-union(s::IntSet) = copy(s)
-union(s1::IntSet, s2::IntSet) = union!(copy(s1), s2)
-union(s1::IntSet, ss::IntSet...) = union(s1, union(ss...))
-union(s::IntSet, ns) = union!(copy(s), ns)
-union!(s::IntSet, ns) = (for n in ns; push!(s, n); end; s)
-function union!(s1::IntSet, s2::IntSet)
-    _matched_map!(|, s1.bits, s2.bits)
-    s1
-end
+union(s::IntSet, sets...) = union!(copy(s), sets...)
+union!(s::IntSet, ns) = foldl(push!, s, ns)
+union!(s1::IntSet, s2::IntSet) = (_matched_map!(|, s1.bits, s2.bits); s1)
 
-intersect(s1::IntSet) = copy(s1)
-intersect(s1::IntSet, ss::IntSet...) = intersect(s1, intersect(ss...))
-function intersect(s1::IntSet, ns)
-    s = IntSet()
-    for n in ns
-        n in s1 && push!(s, n)
-    end
-    s
-end
 intersect(s1::IntSet, s2::IntSet) =
     length(s1.bits) < length(s2.bits) ? intersect!(copy(s1), s2) : intersect!(copy(s2), s1)
-"""
-    intersect!(s1::IntSet, s2::IntSet)
 
-Intersects sets `s1` and `s2` and overwrites the set `s1` with the result. If needed, `s1`
-will be expanded to the size of `s2`.
-"""
-function intersect!(s1::IntSet, s2::IntSet)
-    _matched_map!(&, s1.bits, s2.bits)
-    s1
-end
+intersect!(s1::IntSet, s2::IntSet) = (_matched_map!(&, s1.bits, s2.bits); s1)
 
-setdiff(s::IntSet, ns) = setdiff!(copy(s), ns)
-setdiff!(s::IntSet, ns) = (for n in ns; delete!(s, n); end; s)
-function setdiff!(s1::IntSet, s2::IntSet)
-    _matched_map!((p, q) -> p & ~q, s1.bits, s2.bits)
-    s1
-end
+setdiff!(s1::IntSet, s2::IntSet) = (_matched_map!((p, q) -> p & ~q, s1.bits, s2.bits); s1)
 
-symdiff(s::IntSet, ns) = symdiff!(copy(s), ns)
-"""
-    symdiff!(s, itr)
+symdiff!(s::IntSet, ns) = foldl(symdiff!, s, ns)
 
-For each element in `itr`, destructively toggle its inclusion in set `s`.
-"""
-symdiff!(s::IntSet, ns) = (for n in ns; symdiff!(s, n); end; s)
-"""
-    symdiff!(s, n)
-
-The set `s` is destructively modified to toggle the inclusion of integer `n`.
-"""
 function symdiff!(s::IntSet, n::Integer)
     0 < n < typemax(Int) || _throw_intset_bounds_err()
     val = !(n in s)
     _setint!(s, n, val)
     s
 end
-function symdiff!(s1::IntSet, s2::IntSet)
-    _matched_map!(xor, s1.bits, s2.bits)
-    s1
-end
+
+symdiff!(s1::IntSet, s2::IntSet) = (_matched_map!(xor, s1.bits, s2.bits); s1)
+
+filter!(f, s::IntSet) = unsafe_filter!(f, s)
 
 @inline in(n::Integer, s::IntSet) = get(s.bits, n, false)
 

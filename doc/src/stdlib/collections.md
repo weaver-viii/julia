@@ -229,9 +229,7 @@ Base.intersect
 Base.setdiff
 Base.setdiff!
 Base.symdiff
-Base.symdiff!(::IntSet, ::Integer)
-Base.symdiff!(::IntSet, ::Any)
-Base.symdiff!(::IntSet, ::IntSet)
+Base.symdiff!
 Base.intersect!
 Base.issubset
 ```
