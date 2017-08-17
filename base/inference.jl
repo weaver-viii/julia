@@ -4391,6 +4391,7 @@ function inlineable(@nospecialize(f), @nospecialize(ft), e::Expr, atypes::Vector
         # where we can't easily correct it afterwards.
         frame = InferenceState(linfo, #=optimize=#true, #=cache=#false, sv.params)
         frame.stmt_types[1][3] = VarState(atypes[3], false)
+        frame.src.slottypes[3] = atypes[3]
         typeinf(frame)
     else
         if isdefined(linfo, :inferred) && linfo.inferred !== nothing
