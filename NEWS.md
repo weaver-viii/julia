@@ -329,6 +329,14 @@ Deprecated or removed
   * `diagm(A::SparseMatrixCSC)` has been deprecated in favor of
     `spdiagm(sparsevec(A))` ([#23341]).
 
+  * `titlecase(s)` is deprecated in favor of `titlecase(s, #=strict=# false)`,
+    which means to preserve uppercase characters; in the future, the second
+    argument will default to true, i.e. every character not starting a word
+    will be converted to lowercase.
+    This is to be consistent with the function `istitle` (so that
+    `istitle(titlecase(s))` is always true if `s` contains at least one letter),
+    and with other languages.
+
 Command-line option changes
 ---------------------------
 

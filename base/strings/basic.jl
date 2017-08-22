@@ -406,19 +406,24 @@ julia> lowercase("STRINGS AND THINGS")
 lowercase(s::AbstractString) = map(lowercase, s)
 
 """
-    titlecase(s::AbstractString)
+    titlecase(s::AbstractString, strict::Bool)
 
-Capitalizes the first character of each word in `s`.
+Capitalizes the first character of each word in `s`;
+if `strict` is true, every other character is
+converted to lowercase, otherwise they are left unchanged.
 See also [`ucfirst`](@ref) to capitalize only the first
 character in `s`.
 
 # Examples
 ```jldoctest
-julia> titlecase("the julia programming language")
+julia> titlecase("the JULIA programming language", true)
 "The Julia Programming Language"
+
+julia> titlecase("ISS - international space station", false)
+"ISS - International Space Station"
 ```
 """
-function titlecase(s::AbstractString)
+function titlecase(s::AbstractString, strict::Bool)
     startword = true
     b = IOBuffer()
     for c in s
@@ -426,7 +431,7 @@ function titlecase(s::AbstractString)
             print(b, c)
             startword = true
         else
-            print(b, startword ? titlecase(c) : c)
+            print(b, startword ? titlecase(c) : strict ? lowercase(c) : c)
             startword = false
         end
     end

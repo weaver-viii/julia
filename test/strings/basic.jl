@@ -417,10 +417,12 @@ end
 @test ucfirst(GenericString("A")) == "A"
 
 # titlecase
-@test titlecase('ǉ') == 'ǈ'
-@test titlecase("ǉubljana") == "ǈubljana"
-@test titlecase("aBc ABC") == "ABc ABC"
-@test titlecase("abcD   EFG\n\thij") == "AbcD   EFG\n\tHij"
+@test titlecase('ǉ', true) == 'ǈ'
+@test titlecase("ǉubljana", true) == "ǈubljana"
+@test titlecase("aBc ABC", true)  == "ABc ABC"
+@test titlecase("aBc ABC", false) == "Abc Abc"
+@test titlecase("abcD   EFG\n\thij", true)  == "AbcD   EFG\n\tHij"
+@test titlecase("abcD   EFG\n\thij", false) == "Abcd   Efg\n\tHij"
 
 # issue # 11464: uppercase/lowercase of GenericString becomes a String
 str = "abcdef\uff\uffff\u10ffffABCDEF"
