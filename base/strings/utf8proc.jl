@@ -5,7 +5,7 @@ module UTF8proc
 
 import Base: show, ==, hash, string, Symbol, isless, length, eltype, start, next, done, convert, isvalid, lowercase, uppercase, titlecase
 
-export isgraphemebreak, category_code, category_abbrev, category_string
+export isgraphemebreak, category_code, category_abbrev, category_string, iscased
 
 # also exported by Base:
 export normalize_string, graphemes, is_assigned_char, charwidth, isvalid,
@@ -332,6 +332,19 @@ false
 ```
 """
 isalpha(c::Char)  = (UTF8PROC_CATEGORY_LU <= category_code(c) <= UTF8PROC_CATEGORY_LO)
+
+"""
+    iscased(c::Char) -> Bool
+
+Tests whether a character is cased, i.e. is lower-, upper- or title-cased.
+"""
+function iscased(c::Char)
+    ccode = category_code(c)
+    return ccode == UTF8PROC_CATEGORY_LU ||
+           ccode == UTF8PROC_CATEGORY_LT ||
+           ccode == UTF8PROC_CATEGORY_LL
+end
+
 
 """
     isnumber(c::Char) -> Bool

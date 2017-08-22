@@ -1709,7 +1709,7 @@ export hex2num
 @deprecate diagm(A::SparseMatrixCSC) spdiagm(sparsevec(A))
 
 # PR #23393
-@deprecate titlecase(s::AbstractString) titlecase(s, false)
+@deprecate titlecase(s::AbstractString) titlecase(s, false, true)
 
 # END 0.7 deprecations
 

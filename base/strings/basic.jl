@@ -423,17 +423,23 @@ julia> titlecase("ISS - international space station", false)
 "ISS - International Space Station"
 ```
 """
-function titlecase(s::AbstractString, strict::Bool)
+function titlecase(s::AbstractString, strict::Bool, compat=false)
     startword = true
     b = IOBuffer()
     for c in s
-        if isspace(c)
+        if compat
+            if isspace(c)
+                print(b, c)
+                startword = true
+                continue
+            end
+        elseif !iscased(c)
             print(b, c)
             startword = true
-        else
-            print(b, startword ? titlecase(c) : strict ? lowercase(c) : c)
-            startword = false
+            continue
         end
+        print(b, startword ? titlecase(c) : strict ? lowercase(c) : c)
+        startword = false
     end
     return String(take!(b))
 end
