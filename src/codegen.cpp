@@ -6589,7 +6589,7 @@ static void init_julia_llvm_env(Module *m)
                                          "julia.gcroot_flush");
     add_named_global(gcroot_flush_func, (void*)NULL, /*dllimport*/false);
 
-    pointer_from_objref_func = Function::Create(FunctionType::get(T_pjlvalue,
+    pointer_from_objref_func = Function::Create(FunctionType::get(T_size,
                                          ArrayRef<Type*>(PointerType::get(T_jlvalue, AddressSpace::Derived)), false),
                                          Function::ExternalLinkage,
                                          "julia.pointer_from_objref");
