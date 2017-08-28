@@ -4753,12 +4753,25 @@ function statement_cost(ex::Expr, src::CodeInfo, mod::Module, params::InferenceP
     argcost
 end
 
+function skip_boundschecks(stmt, body, s)
+    if stmt isa Expr && stmt.head == :boundscheck && stmt.args[1] == true
+        while !(stmt isa Expr && stmt.head == :boundscheck && stmt.args[1] == Expr(:boundscheck, :pop))
+            done(body, s) && break
+            (stmt, s) = next(body, s)
+            (stmt, s) = skip_boundschecks(stmt, body, s)
+        end
+    end
+    return (stmt, s)
+end
+
 function inline_worthy(body::Array{Any,1}, src::CodeInfo, mod::Module,
                        params::InferenceParams,
                        cost_threshold::Integer=params.inline_cost_threshold)
     bodycost = 0
-    for line = 1:length(body)
-        stmt = body[line]
+    s = start(body)
+    while !done(body, s)
+        (stmt, s) = next(body, s)
+        (stmt, s) = skip_boundschecks(stmt, body, s)
         thiscost = statement_cost(stmt, src, mod, params)
         bodycost = plus_saturate(bodycost, thiscost)
     end
