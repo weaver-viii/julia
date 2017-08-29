@@ -25,6 +25,7 @@
 #define MAP_ANONYMOUS MAP_ANON
 #endif
 #endif
+#define GC_DEBUG_ENV
 
 #ifdef __cplusplus
 extern "C" {
