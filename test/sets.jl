@@ -314,10 +314,11 @@ end
 @test allunique(7:-1:1)       # negative step
 
 # filter
-s = Set([1,2,3,4])
-@test isequal(filter(isodd,s), Set([1,3]))
-filter!(isodd, s)
-@test isequal(s, Set([1,3]))
+for S = (Set, IntSet)
+    s = S([1,2,3,4])
+    @test s !== filter( isodd, s) == S([1,3])
+    @test s === filter!(isodd, s) == S([1,3])
+end
 
 # first
 @test_throws ArgumentError first(Set())
