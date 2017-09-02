@@ -390,11 +390,7 @@ function filter(f, d::Associative)
     # don't just do filter!(f, copy(d)): avoid making a whole copy of d
     df = similar(d)
     try
-        for (k, v) in d
-            if f(k => v)
-                df[k] = v
-            end
-        end
+        mapfilter(f, push!, d, df)
     catch e
         if isa(e, MethodError) && e.f === f
             depwarn("In `filter(f, dict)`, `f` is now passed a single pair instead of two arguments.", :filter)
