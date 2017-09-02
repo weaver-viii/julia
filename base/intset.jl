@@ -111,7 +111,6 @@ isempty(s::IntSet) = !any(s.bits)
 # Mathematical set functions: union!, intersect!, setdiff!, symdiff!
 
 union(s::IntSet, sets...) = union!(copy(s), sets...)
-union!(s::IntSet, ns) = foldl(push!, s, ns)
 union!(s1::IntSet, s2::IntSet) = (_matched_map!(|, s1.bits, s2.bits); s1)
 
 intersect(s1::IntSet, s2::IntSet) =
