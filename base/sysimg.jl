@@ -85,7 +85,6 @@ end
 include("essentials.jl")
 include("ctypes.jl")
 include("gcutils.jl")
-include("nullabletype.jl")
 include("generator.jl")
 include("reflection.jl")
 include("options.jl")
@@ -232,8 +231,8 @@ include("multidimensional.jl")
 include("permuteddimsarray.jl")
 using .PermutedDimsArrays
 
-# nullable types
-include("nullable.jl")
+# Null and Some types
+include("null.jl")
 
 include("broadcast.jl")
 using .Broadcast

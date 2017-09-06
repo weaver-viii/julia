@@ -102,7 +102,7 @@ function show_method_params(io::IO, tv)
     end
 end
 
-function show(io::IO, m::Method; kwtype::Nullable{DataType}=Nullable{DataType}())
+function show(io::IO, m::Method; kwtype::Union{Some{DataType}, Null}=null)
     tv, decls, file, line = arg_decl_parts(m)
     sig = unwrap_unionall(m.sig)
     ft0 = sig.parameters[1]
@@ -157,7 +157,7 @@ function show_method_table(io::IO, ms::MethodList, max::Int=-1, header::Bool=tru
         what = startswith(ns, '@') ? "macro" : "generic function"
         print(io, "# $n $m for ", what, " \"", ns, "\":")
     end
-    kwtype = isdefined(mt, :kwsorter) ? Nullable{DataType}(typeof(mt.kwsorter)) : Nullable{DataType}()
+    kwtype = isdefined(mt, :kwsorter) ? Some(typeof(mt.kwsorter)) : null
     n = rest = 0
     local last
 
@@ -233,7 +233,7 @@ function url(m::Method)
     end
 end
 
-function show(io::IO, ::MIME"text/html", m::Method; kwtype::Nullable{DataType}=Nullable{DataType}())
+function show(io::IO, ::MIME"text/html", m::Method; kwtype::Union{Some{DataType}, Null}=null)
     tv, decls, file, line = arg_decl_parts(m)
     sig = unwrap_unionall(m.sig)
     ft0 = sig.parameters[1]
@@ -290,7 +290,7 @@ function show(io::IO, mime::MIME"text/html", ms::MethodList)
     ns = string(name)
     what = startswith(ns, '@') ? "macro" : "generic function"
     print(io, "$n $meths for ", what, " <b>$ns</b>:<ul>")
-    kwtype = isdefined(mt, :kwsorter) ? Nullable{DataType}(typeof(mt.kwsorter)) : Nullable{DataType}()
+    kwtype = isdefined(mt, :kwsorter) ? Some(typeof(mt.kwsorter)) : null
     for meth in ms
         print(io, "<li> ")
         show(io, mime, meth; kwtype=kwtype)

@@ -104,7 +104,7 @@ mutable struct PipeEndpoint <: LibuvStream
     readnotify::Condition
     connectnotify::Condition
     closenotify::Condition
-    sendbuf::Nullable{IOBuffer}
+    sendbuf::Union{Some{IOBuffer}, Null}
     lock::ReentrantLock
     throttle::Int
 
@@ -116,7 +116,7 @@ mutable struct PipeEndpoint <: LibuvStream
                 Condition(),
                 Condition(),
                 Condition(),
-                nothing,
+                null,
                 ReentrantLock(),
                 DEFAULT_READ_BUFFER_SZ)
         associate_julia_struct(handle, p)
@@ -154,7 +154,7 @@ mutable struct TTY <: LibuvStream
     buffer::IOBuffer
     readnotify::Condition
     closenotify::Condition
-    sendbuf::Nullable{IOBuffer}
+    sendbuf::Union{Some{IOBuffer}, Null}
     lock::ReentrantLock
     throttle::Int
     @static if Sys.iswindows(); ispty::Bool; end
@@ -166,7 +166,8 @@ mutable struct TTY <: LibuvStream
             PipeBuffer(),
             Condition(),
             Condition(),
-            nothing, ReentrantLock(),
+            null,
+            ReentrantLock(),
             DEFAULT_READ_BUFFER_SZ)
         associate_julia_struct(handle, tty)
         finalizer(tty, uvfinalize)
@@ -878,7 +879,7 @@ function flush(s::LibuvStream)
     return
 end
 
-buffer_writes(s::LibuvStream, bufsize) = (s.sendbuf=PipeBuffer(bufsize); s)
+buffer_writes(s::LibuvStream, bufsize) = (s.sendbuf=Some(PipeBuffer(bufsize)); s)
 
 ## low-level calls to libuv ##
 

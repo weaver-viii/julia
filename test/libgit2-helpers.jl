@@ -12,7 +12,7 @@ without having to authenticate against a real server.
 function credential_loop(
         valid_credential::AbstractCredentials,
         url::AbstractString,
-        user::Nullable{<:AbstractString},
+        user::Union{Some{<:AbstractString}, Null},
         allowed_types::UInt32,
         payload::CredentialPayload)
     cb = Base.LibGit2.credentials_cb()
@@ -59,7 +59,7 @@ end
 function credential_loop(
         valid_credential::UserPasswordCredentials,
         url::AbstractString,
-        user::Nullable{<:AbstractString}=Nullable{String}(),
+        user::Union{Some{<:AbstractString}, Null}=null,
         payload::CredentialPayload=DEFAULT_PAYLOAD)
     credential_loop(valid_credential, url, user, 0x000001, payload)
 end
@@ -67,7 +67,7 @@ end
 function credential_loop(
         valid_credential::SSHCredentials,
         url::AbstractString,
-        user::Nullable{<:AbstractString}=Nullable{String}(),
+        user::Union{Some{<:AbstractString}, Null}=null,
         payload::CredentialPayload=DEFAULT_PAYLOAD)
     credential_loop(valid_credential, url, user, 0x000046, payload)
 end
@@ -77,5 +77,5 @@ function credential_loop(
         url::AbstractString,
         user::AbstractString,
         payload::CredentialPayload=DEFAULT_PAYLOAD)
-    credential_loop(valid_credential, url, Nullable(user), payload)
+    credential_loop(valid_credential, url, Some(user), payload)
 end

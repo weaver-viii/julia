@@ -77,7 +77,7 @@ export
     Matrix,
     MergeSort,
     NTuple,
-    Nullable,
+    Null,
     ObjectIdDict,
     OrdinalRange,
     Pair,
@@ -101,6 +101,7 @@ export
     AbstractSerializer,
     SerializationState,
     Set,
+    Some,
     StepRange,
     StepRangeLen,
     StridedArray,
@@ -1162,9 +1163,9 @@ export
     unsafe_store!,
     unsafe_write,
 
-# nullable types
+# nulls
     isnull,
-    unsafe_get,
+    null,
 
 # Macros
     # parser internal
