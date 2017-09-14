@@ -15,8 +15,8 @@ struct T5589
 end
 @test replstr(T5589(Array{String,1}(100))) == "$(curmod_prefix)T5589([#undef, #undef, #undef, #undef, #undef, #undef, #undef, #undef, #undef, #undef  …  #undef, #undef, #undef, #undef, #undef, #undef, #undef, #undef, #undef, #undef])"
 
-@test replstr(parse("mutable struct X end")) == ":(mutable struct X\n        #= none:1 =#\n    end)"
-@test replstr(parse("struct X end")) == ":(struct X\n        #= none:1 =#\n    end)"
+@test replstr(parse("mutable struct X end")) == ":(mutable struct X\n      #= none:1 =#\n  end)"
+@test replstr(parse("struct X end")) == ":(struct X\n      #= none:1 =#\n  end)"
 let s = "ccall(:f, Int, (Ptr{Void},), &x)"
     @test replstr(parse(s)) == ":($s)"
 end
@@ -272,6 +272,22 @@ d
 elseif e
 # line meta
 f
+end
+"""
+
+@test_repr """f(x, y) do z, w
+# line meta
+a
+# line meta
+b
+end
+"""
+
+@test_repr """f(x, y) do z
+# line meta
+a
+# line meta
+b
 end
 """
 
