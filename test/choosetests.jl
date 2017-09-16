@@ -47,11 +47,9 @@ function choosetests(choices = [])
         "markdown", "serialize", "misc", "threads",
         "enums", "cmdlineargs", "i18n", "workspace", "libdl", "int",
         "checked", "bitset", "floatfuncs", "compile", "distributed", "inline",
-        "boundscheck", "error", "cartesian", "asmvariant", "osutils",
+        "boundscheck", "error", "ambiguous", "cartesian", "asmvariant", "osutils",
         "channels", "iostream", "specificity", "codegen", "codevalidation",
         "reinterpretarray", "syntax"
-        # FIXME: fix ambiguities
-        "ambiguous"
     ]
 
     if isdir(joinpath(JULIA_HOME, Base.DOCDIR, "examples"))
