@@ -241,6 +241,14 @@ end
 
 show(io::IO, x::DataType) = show_datatype(io, x)
 
+# Check whether 'sym' (defined in module 'parent') is reachable from module 'from'
+# If an object with this name exists in 'from', we need to check it's the same object
+function is_reachable(sym::Symbol, parent::Module, from::Module)
+    isdefined(from, sym) || return false
+    getfield(from, sym) === getfield(parent, sym)
+end
+is_reachable(sym::Symbol, parent::Module, from::Void) = false
+
 function show_type_name(io::IO, tn::TypeName)
     if tn === UnionAll.name
         # by coincidence, `typeof(Type)` is a valid representation of the UnionAll type.
@@ -266,7 +274,14 @@ function show_type_name(io::IO, tn::TypeName)
     elseif globfunc
         print(io, "typeof(")
     end
-    if isdefined(tn, :module) && !(is_exported_from_stdlib(sym, tn.module) || (tn.module === Main && !hidden))
+    # Print module prefix unless type is:
+    # - exported from standard library
+    # - reachable from module passed to IOContext
+    # - defined in Main and not hidden
+    if isdefined(tn, :module) &&
+        !(is_exported_from_stdlib(sym, tn.module) ||
+          is_reachable(sym, tn.module, get(io, :module, nothing)) ||
+          (tn.module === Main && !hidden))
         show(io, tn.module)
         if !hidden
             print(io, ".")
@@ -2004,7 +2019,7 @@ function showarray(io::IO, X::AbstractArray, repr::Bool = true; header = true)
         # override usual show method for Vector{Method}: don't abbreviate long lists
         io = IOContext(io, :limit => false)
     end
-    (!repr && header) && print(io, summary(X))
+    (!repr && header) && summary(io, X)
     if !isempty(X)
         if !repr && header
             print(io, ":")
