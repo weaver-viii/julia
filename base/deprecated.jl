@@ -2073,6 +2073,17 @@ end
 # issue #24167
 @deprecate EnvHash EnvDict
 
+# Broadcast extension API (#23939)
+@eval Broadcast begin
+    Base.@deprecate_binding containertype combine_styles false
+    Base.@deprecate_binding _containertype BroadcastStyle false
+    Base.@deprecate_binding promote_containertype BroadcastStyle false
+    Base.@deprecate_binding broadcast_c! broadcast! false ", broadcast_c!(f, ::Type, ::Type, C, As...) should become broadcast!(f, C, As...) (see the manual chapter Interfaces)"
+    Base.@deprecate_binding broadcast_c broadcast false ", `broadcast_c(f, ::Type{C}, As...)` should become `broadcast(f, C, nothing, nothing, As...))` (see the manual chapter Interfaces)"
+    Base.@deprecate_binding broadcast_t broadcast false ", broadcast_t(f, ::Type{ElType}, shape, iter, As...)` should become `broadcast(f, Broadcast.DefaultArrayStyle{N}(), ElType, shape, As...))` (see the manual chapter Interfaces)"
+end
+
+
 # END 0.7 deprecations
 
 # BEGIN 1.0 deprecations
