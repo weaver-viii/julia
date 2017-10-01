@@ -490,8 +490,8 @@ function _replace!(prednew::Callable, A::Union{Associative,AbstractSet}, count::
     c = 0
     for x in A
         y = prednew(x)
-        if !isnull(y)
-            push!(repl, x => unsafe_get(y))
+        if y !== nothing
+            push!(repl, x => get(y))
             c += 1
             c == count && break
         end

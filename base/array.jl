@@ -2434,6 +2434,14 @@ symdiff(a, b, rest...) = symdiff(a, symdiff(b, rest...))
 
 ## replace/replace! ##
 
+
+struct Some{T}
+    value::T
+end
+
+eltype(::Type{Some{T}}) where {T} = T
+get(x::Some) = x.value
+
 # NOTE: to implement replace! and replace for a new type T, it's enough to define:
 # function _replace!(pred::Callable, new::Callable, A::T, count::Int)
 
@@ -2465,9 +2473,8 @@ replace!(A, old_new::Pair...; count::Integer=typemax(Int)) = _replace!(A, eltype
 function _replace!(A, ::Type{K}, count::Integer, old_new #=::Pair...=#) where {K}
     @inline function prednew(x)
         for o_n in old_new
-            first(o_n) == x && return Nullable{K}(last(o_n))
+            first(o_n) == x && return Some{K}(last(o_n))
         end
-        Nullable{K}()
     end
     _replace!(prednew, A, count)
 end
@@ -2491,7 +2498,7 @@ julia> replace!(isodd, A, 0, count=2)
 ```
 """
 replace!(pred::Callable, A, new; count::Integer=typemax(Int)) =
-    _replace!(x->Nullable(new, pred(x)), A, count)
+    _replace!(x -> if pred(x) Some(new) end, A, count)
 
 """
     replace!(prednew::Function, A; [count::Integer])
@@ -2534,8 +2541,8 @@ function _replace!(prednew::Callable, A::AbstractArray, count::Int)
     c = 0
     @inbounds for i in eachindex(A)
         y = prednew(A[i])
-        if !isnull(y)
-            A[i] = unsafe_get(y)
+        if y !== nothing
+            A[i] = get(y)
             c += 1
             c == count && break
         end
@@ -2581,7 +2588,7 @@ julia> replace(isodd, [1, 2, 3, 1], 0, count=2)
 ```
 """
 replace(pred::Callable, A, new; count::Integer=typemax(Int)) =
-    _replace!(x->Nullable(new, pred(x)), copy(A), count)
+    _replace!(x -> if pred(x) Some(new) end, copy(A), count)
 
 """
     replace(prednew::Function, A; [count::Integer])

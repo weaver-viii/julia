@@ -2238,10 +2238,12 @@ end
     @test_throws BoundsError checkbounds(zeros(2,3,0), 2, 3)
 end
 
+maybe(v, p) = if p Some(v) end
+
 @testset "replace! & replace" begin
     a = [1, 2, 3, 1]
-    @test replace(x->Nullable(2x, iseven(x)), a) == [1, 4, 3, 1]
-    @test replace!(x->Nullable(2x, iseven(x)), a) === a
+    @test replace(x->maybe(2x, iseven(x)), a) == [1, 4, 3, 1]
+    @test replace!(x->maybe(2x, iseven(x)), a) === a
     @test a == [1, 4, 3, 1]
     @test replace(a, 1=>0) == [0, 4, 3, 0]
     @test replace(a, 1=>0, count=1) == [0, 4, 3, 1]
@@ -2250,7 +2252,7 @@ end
 
     d = Dict(1=>2, 3=>4)
     @test replace(x->x.first > 2, d, 0=>0) == Dict(1=>2, 0=>0)
-    @test replace!(x->Nullable(x.first=>2*x.second, x.first > 2), d) === d
+    @test replace!(x->maybe(x.first=>2*x.second, x.first > 2), d) === d
     @test d == Dict(1=>2, 3=>8)
     @test replace(d, (3=>8)=>(0=>0)) == Dict(1=>2, 0=>0)
     @test replace!(d, (3=>8)=>(2=>2)) === d
@@ -2259,8 +2261,8 @@ end
                                                           Dict(2=>2, 0=>0)]
 
     s = Set([1, 2, 3])
-    @test replace(x->Nullable(2x, x>1), s) == Set([1, 4, 6])
-    @test replace(x->Nullable(2x, x>1), s, count=1) in [Set([1, 4, 3]), Set([1, 2, 6])]
+    @test replace(x->maybe(2x, x>1), s) == Set([1, 4, 6])
+    @test replace(x->maybe(2x, x>1), s, count=1) in [Set([1, 4, 3]), Set([1, 2, 6])]
     @test replace(s, 1=>4) == Set([2, 3, 4])
     @test replace!(s, 1=>2) === s
     @test s == Set([2, 3])
