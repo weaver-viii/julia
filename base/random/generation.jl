@@ -200,7 +200,7 @@ RangeGeneratorInt(a::T, k::U) where {T,U<:Union{UInt32,UInt128}} =
 RangeGeneratorInt(a::T, k::UInt64) where {T} =
     RangeGeneratorInt{T,UInt64}(a, k, maxmultiplemix(k))
 
-function RangeGenerator(r::UnitRange{T}) where T<:Unsigned
+function RangeGenerator(r::AbstractUnitRange{T}) where T<:Unsigned
     isempty(r) && throw(ArgumentError("range must be non-empty"))
     RangeGeneratorInt(first(r), last(r) - first(r) + oneunit(T))
 end
@@ -209,7 +209,7 @@ for (T, U) in [(UInt8, UInt32), (UInt16, UInt32),
                (Int8, UInt32), (Int16, UInt32), (Int32, UInt32),
                (Int64, UInt64), (Int128, UInt128), (Bool, UInt32)]
 
-    @eval RangeGenerator(r::UnitRange{$T}) = begin
+    @eval RangeGenerator(r::AbstractUnitRange{$T}) = begin
         isempty(r) && throw(ArgumentError("range must be non-empty"))
         # overflow ok:
         RangeGeneratorInt(first(r), convert($U, unsigned(last(r) - first(r)) + one($U)))
@@ -227,7 +227,7 @@ struct RangeGeneratorBigInt <: RangeGenerator
 end
 
 
-function RangeGenerator(r::UnitRange{BigInt})
+function RangeGenerator(r::AbstractUnitRange{BigInt})
     m = last(r) - first(r)
     m < 0 && throw(ArgumentError("range must be non-empty"))
     nd = ndigits(m, 2)
@@ -292,23 +292,23 @@ function rand!(rng::AbstractRNG, A::AbstractArray, g::RangeGenerator)
     return A
 end
 
-### random values from UnitRange
+### random values from AbstractUnitRange
 
-rand(rng::AbstractRNG, r::UnitRange{<:Integer}) = rand(rng, RangeGenerator(r))
+rand(rng::AbstractRNG, r::AbstractUnitRange{<:Integer}) = rand(rng, RangeGenerator(r))
 
-rand!(rng::AbstractRNG, A::AbstractArray, r::UnitRange{<:Integer}) =
+rand!(rng::AbstractRNG, A::AbstractArray, r::AbstractUnitRange{<:Integer}) =
     rand!(rng, A, RangeGenerator(r))
 
 ## random values from AbstractArray
 
 rand(                  r::AbstractArray) = rand(GLOBAL_RNG, r)
 rand(rng::AbstractRNG, r::AbstractArray) =
-    @inbounds return r[rand(rng, UnitRange(linearindices(r)))]
+    @inbounds return r[rand(rng, linearindices(r))]
 
 ### arrays
 
 function rand!(rng::AbstractRNG, A::AbstractArray, r::AbstractArray)
-    g = RangeGenerator(UnitRange(linearindices(r)))
+    g = RangeGenerator(linearindices(r))
     for i in eachindex(A)
         @inbounds A[i] = r[rand(rng, g)]
     end
