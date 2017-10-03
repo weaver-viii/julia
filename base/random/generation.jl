@@ -301,13 +301,14 @@ rand!(rng::AbstractRNG, A::AbstractArray, r::UnitRange{<:Integer}) =
 
 ## random values from AbstractArray
 
-rand(rng::AbstractRNG, r::AbstractArray) = @inbounds return r[rand(rng, 1:length(r))]
 rand(                  r::AbstractArray) = rand(GLOBAL_RNG, r)
+rand(rng::AbstractRNG, r::AbstractArray) =
+    @inbounds return r[rand(rng, UnitRange(linearindices(r)))]
 
 ### arrays
 
 function rand!(rng::AbstractRNG, A::AbstractArray, r::AbstractArray)
-    g = RangeGenerator(1:(length(r)))
+    g = RangeGenerator(UnitRange(linearindices(r)))
     for i in eachindex(A)
         @inbounds A[i] = r[rand(rng, g)]
     end
