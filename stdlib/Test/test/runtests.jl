@@ -285,10 +285,8 @@ end
                 end
             end
             @testset "some loops fail" begin
-                guardsrand(123) do
-                    @testset for i in 1:5
-                        @test i <= rand(1:10)
-                    end
+                @testset for i in 1:5
+                    @test i <= rand(1:3)
                 end
                 # should add 3 errors and 3 passing tests
                 @testset for i in 1:6

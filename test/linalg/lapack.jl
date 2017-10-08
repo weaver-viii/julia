@@ -10,25 +10,24 @@ import Base.LinAlg.BlasInt
 @test_throws ArgumentError Base.LinAlg.LAPACK.chktrans('Z')
 
 @testset "syevr" begin
-    guardsrand(123) do
-        Ainit = randn(5,5)
-        @testset for elty in (Float32, Float64, Complex64, Complex128)
-            if elty == Complex64 || elty == Complex128
-                A = complex.(Ainit, Ainit)
-            else
-                A = Ainit
-            end
-            A = convert(Array{elty, 2}, A)
-            Asym = A'A
-            vals, Z = LAPACK.syevr!('V', copy(Asym))
-            @test Z*(Diagonal(vals)*Z') ≈ Asym
-            @test all(vals .> 0.0)
-            @test LAPACK.syevr!('N','V','U',copy(Asym),0.0,1.0,4,5,-1.0)[1] ≈ vals[vals .< 1.0]
-            @test LAPACK.syevr!('N','I','U',copy(Asym),0.0,1.0,4,5,-1.0)[1] ≈ vals[4:5]
-            @test vals ≈ LAPACK.syev!('N','U',copy(Asym))
-
-            @test_throws DimensionMismatch LAPACK.sygvd!(1,'V','U',copy(Asym),ones(elty,6,6))
+    srand(123)
+    Ainit = randn(5,5)
+    @testset for elty in (Float32, Float64, Complex64, Complex128)
+        if elty == Complex64 || elty == Complex128
+            A = complex.(Ainit, Ainit)
+        else
+            A = Ainit
         end
+        A = convert(Array{elty, 2}, A)
+        Asym = A'A
+        vals, Z = LAPACK.syevr!('V', copy(Asym))
+        @test Z*(Diagonal(vals)*Z') ≈ Asym
+        @test all(vals .> 0.0)
+        @test LAPACK.syevr!('N','V','U',copy(Asym),0.0,1.0,4,5,-1.0)[1] ≈ vals[vals .< 1.0]
+        @test LAPACK.syevr!('N','I','U',copy(Asym),0.0,1.0,4,5,-1.0)[1] ≈ vals[4:5]
+        @test vals ≈ LAPACK.syev!('N','U',copy(Asym))
+
+        @test_throws DimensionMismatch LAPACK.sygvd!(1,'V','U',copy(Asym),ones(elty,6,6))
     end
 end
 
@@ -433,15 +432,14 @@ end
 
 @testset "sysv" begin
     @testset for elty in (Float32, Float64, Complex64, Complex128)
-        guardsrand(123) do
-            A = rand(elty,10,10)
-            A = A + A.' #symmetric!
-            b = rand(elty,10)
-            c = A \ b
-            b,A = LAPACK.sysv!('U',A,b)
-            @test b ≈ c
-            @test_throws DimensionMismatch LAPACK.sysv!('U',A,rand(elty,11))
-        end
+        srand(123)
+        A = rand(elty,10,10)
+        A = A + A.' #symmetric!
+        b = rand(elty,10)
+        c = A \ b
+        b,A = LAPACK.sysv!('U',A,b)
+        @test b ≈ c
+        @test_throws DimensionMismatch LAPACK.sysv!('U',A,rand(elty,11))
     end
 end
 

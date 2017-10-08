@@ -2,8 +2,8 @@
 
 
 
-# Issue #6573
-guardsrand(0) do
+@testset "Issue #6573" begin
+    srand(0)
     rand()
     x = rand(384)
     @test find(x .== rand()) == []
