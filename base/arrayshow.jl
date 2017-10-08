@@ -1,3 +1,37 @@
+# This file is a part of Julia. License is MIT: https://julialang.org/license
+
+# methods related to array printing
+
+# Printing a value requires to take into account the :typeinfo property
+# from the IO context; this property encodes (as a type) the type information
+# that is supposed to have already been displayed concerning this value,
+# so that redundancy can be avoided. For example, when printing an array of
+# `Float16` values, the header "Float16" will be printed, and the values
+# can simply be printed with the decimal representations:
+# show(Float16(1)) -> "Float16(1.0)"
+# show([Float16(1)]) -> "Float16[1.0]" (instead of "Float16[Float16(1.0)]")
+# Similarly:
+# show([[Float16(1)]]) -> "Array{Float16}[[1.0]]" (instead of "Array{Float16}[Float16[1.0]]")
+#
+# The array printing methods here can be grouped into two categories (and are annotated as such):
+# 1) "typeinfo aware" : these are "API boundaries" functions, which will read the typeinfo
+#    property from the context, and pass down to their value an updated property
+#    according to its eltype;
+# 2) "typeinfo agnostic": this are helper functions used by the first category; hence
+#    they don't manipulate the typeinfo property, and let the printing routines
+#    for their elements read directly the property set by their callers
+#
+# Non-annotated functions are even lower level (e.g. print_matrix_row), so they fall
+# by default into category 2.
+#
+# The basic organization of this file is
+# 1) printing with `display`
+# 2) printing with `show`
+# 3) Logic for displaying type information
+
+
+## printing with `display`
+
 """
 Unexported convenience function used in body of `replace_in_print_matrix`
 methods. By default returns a string of the same width as original with a
@@ -142,6 +176,7 @@ function print_matrix_vdots(io::IO, vdots::AbstractString,
     end
 end
 
+# typeinfo agnostic
 """
     print_matrix(io::IO, mat, pre, sep, post, hdots, vdots, ddots, hmod, vmod)
 
@@ -257,8 +292,9 @@ function print_matrix(io::IO, X::AbstractVecOrMat,
     end
 end
 
+# typeinfo agnostic
 # n-dimensional arrays
-function show_nd(io::IO, a::AbstractArray, print_matrix, label_slices)
+function show_nd(io::IO, a::AbstractArray, print_matrix::Function, label_slices::Bool)
     limit::Bool = get(io, :limit, false)
     if isempty(a)
         return
@@ -302,15 +338,63 @@ function show_nd(io::IO, a::AbstractArray, print_matrix, label_slices)
     end
 end
 
-"""
-`print_matrix_repr(io, X)` prints matrix X with opening and closing square brackets.
-"""
-function print_matrix_repr(io, X::AbstractArray)
-    limit = get(io, :limit, false)::Bool
-    compact, prefix = array_eltype_show_how(X)
-    if compact && !haskey(io, :compact)
-        io = IOContext(io, :compact => compact)
+# print_array: main helper functions for _display
+# typeinfo agnostic
+
+# 0-dimensional arrays
+print_array(io::IO, X::AbstractArray{T,0} where T) = isassigned(X) ?
+    show(io, X[]) :
+    print(io, undef_ref_str)
+
+print_array(io::IO, X::AbstractVecOrMat) = print_matrix(io, X)
+
+print_array(io::IO, X::AbstractArray) = show_nd(io, X, print_matrix, true)
+
+# typeinfo aware
+# implements: show(io::IO, ::MIME"text/plain", X::AbstractArray)
+function _display(io::IO, X::AbstractArray)
+    # 0) compute new IOContext
+    if !haskey(io, :compact) && length(indices(X, 2)) > 1
+        io = IOContext(io, :compact => true)
     end
+    if get(io, :limit, false) && eltype(X) === Method
+        # override usual show method for Vector{Method}: don't abbreviate long lists
+        io = IOContext(io, :limit => false)
+    end
+    # we assume this function is always called from top-level, i.e. that it's not nested
+    # within another "show" method; hence we always print the summary, without
+    # checking for current :typeinfo (this could be changed in the future)
+    io = IOContext(io, :typeinfo => eltype(X))
+
+    # 1) print summary info
+    print(io, summary(X))
+    isempty(X) && return
+    print(io, ":")
+    if get(io, :limit, false) && displaysize(io)[1]-4 <= 0
+        return print(io, " …")
+    else
+        println(io)
+    end
+
+    # 2) show actual content
+    print_array(io, X)
+end
+
+
+## printing with `show`
+
+### non-Vector arrays
+
+# _show & _show_empty: main helper function for show(io, X)
+# typeinfo agnostic
+
+"""
+`_show(io, X::AbstractMatrix, prefix)` prints matrix X with opening and closing square brackets,
+preceded by `prefix`, supposed to encode the type of the elements.
+"""
+function _show(io::IO, X::AbstractMatrix, prefix::String)
+    @assert !isempty(X)
+    limit = get(io, :limit, false)::Bool
     indr, indc = indices(X,1), indices(X,2)
     nr, nc = length(indr), length(indc)
     rdots, cdots = false, false
@@ -351,86 +435,68 @@ function print_matrix_repr(io, X::AbstractArray)
     print(io, "]")
 end
 
-show(io::IO, X::AbstractArray) = showarray(io, X, true)
 
-repremptyarray(io::IO, X::Array{T}) where {T} = print(io, "Array{$T}(", join(size(X),','), ')')
-repremptyarray(io, X) = nothing # by default, we don't know this constructor
+_show(io::IO, X::AbstractArray, prefix::String) =
+    show_nd(io, X, (io, slice) -> _show(io, slice, prefix), false)
 
-function showarray(io::IO, X::AbstractArray, repr::Bool = true; header = true)
-    if repr && ndims(X) == 1
-        return show_vector(io, X, "[", "]")
-    end
-    if !haskey(io, :compact) && length(indices(X, 2)) > 1
-        io = IOContext(io, :compact => true)
-    end
-    if !repr && get(io, :limit, false) && eltype(X) === Method
-        # override usual show method for Vector{Method}: don't abbreviate long lists
-        io = IOContext(io, :limit => false)
-    end
-    (!repr && header) && print(io, summary(X))
-    if !isempty(X)
-        if !repr && header
-            print(io, ":")
-            if get(io, :limit, false) && displaysize(io)[1]-4 <= 0
-                return print(io, " …")
-            else
-                println(io)
-            end
-        end
-        if ndims(X) == 0
-            if isassigned(X)
-                return show(io, X[])
-            else
-                return print(io, undef_ref_str)
-            end
-        end
-        if repr
-            if ndims(X) <= 2
-                print_matrix_repr(io, X)
-            else
-                show_nd(io, X, print_matrix_repr, false)
-            end
-        else
-            punct = (" ", "  ", "")
-            if ndims(X) <= 2
-                print_matrix(io, X, punct...)
-            else
-                show_nd(io, X,
-                        (io, slice) -> print_matrix(io, slice, punct...),
-                        !repr)
-            end
-        end
-    elseif repr
-        repremptyarray(io, X)
-    end
+# a specific call path is used to show vectors (show_vector)
+_show(::IO, ::AbstractVector, ::String) = error("_show(::IO, ::AbstractVector, ::String) is not implemented")
+
+_show(io::IO, X::AbstractArray{T,0} where T, prefix::String) = print_array(io, X)
+
+# NOTE: it's not clear how this method could use the :typeinfo attribute
+_show_empty(io::IO, X::Array{T}) where {T} = print(io, "Array{$T}(", join(size(X),','), ')')
+_show_empty(io, X) = nothing # by default, we don't know this constructor
+
+# typeinfo aware (necessarily)
+function show(io::IO, X::AbstractArray)
+    @assert ndims(X) != 1
+    prefix = typeinfo_prefix(io, X)
+    io = IOContext(io, :typeinfo => eltype(X), :compact => true)
+    isempty(X) ?
+        _show_empty(io, X) :
+        _show(io, X, prefix)
 end
 
-# returns compact, prefix
-function array_eltype_show_how(X)
-    e = eltype(X)
-    if print_without_params(e)
-        str = string(unwrap_unionall(e).name) # Print "Array" rather than "Array{T,N}"
-    else
-        str = string(e)
-    end
-    # Types hard-coded here are those which are created by default for a given syntax
-    (_isleaftype(e),
-     (!isempty(X) && (e===Float64 || e===Int || e===Char || e===String) ? "" : str))
-end
+### Vector arrays
 
-function show_vector(io::IO, v, opn, cls)
-    compact, prefix = array_eltype_show_how(v)
+# typeinfo aware
+# NOTE: v is not constrained to be a vector, as this function can work with iterables
+# in general (it's used e.g. by show(::IO, ::Set))
+function show_vector(io::IO, v, opn='[', cls=']')
+    print(io, typeinfo_prefix(io, v))
+    # directly or indirectly, the context now knows about eltype(v)
+    io = IOContext(io, :typeinfo => eltype(v), :compact => true)
     limited = get(io, :limit, false)
-    if compact && !haskey(io, :compact)
-        io = IOContext(io, :compact => compact)
-    end
-    print(io, prefix)
     if limited && _length(v) > 20
         inds = indices1(v)
         show_delim_array(io, v, opn, ",", "", false, inds[1], inds[1]+9)
-        print(io, "  \u2026  ")
+        print(io, "  \u2026  ") # i.e. "  …  "
         show_delim_array(io, v, "", ",", cls, false, inds[end-9], inds[end])
     else
         show_delim_array(io, v, opn, ",", cls, false)
+    end
+end
+
+show(io::IO, X::AbstractVector) = show_vector(io, X)
+
+
+## Logic for displaying type information
+
+# X not constrained, can be any iterable (cf. show_vector)
+function typeinfo_prefix(io::IO, X)
+    typeinfo = get(io, :typeinfo, Any)::Union{DataType,UnionAll}
+    @assert X isa typeinfo
+    # what the context already knows about the eltype of X:
+    # (could use a more specific tool than eltype, maybe with _isleaftype)
+    eltype_ctx = eltype(typeinfo)
+    eltype_X = eltype(X)
+    # Types hard-coded here are those which are created by default for a given syntax
+    if eltype_X == eltype_ctx || !isempty(X) && eltype_X in (Float64, Int, Char, String)
+        ""
+    elseif print_without_params(eltype_X)
+        string(unwrap_unionall(eltype_X).name) # Print "Array" rather than "Array{T,N}"
+    else
+        string(eltype_X)
     end
 end
