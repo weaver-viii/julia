@@ -614,6 +614,11 @@ Deprecated or removed
   * `a:b` is deprecated for constructing a `StepRange` when `a` and `b` have physical units
     (Dates and Times). Use `a:s:b`, where `s = Dates.Day(1)` or `s = Dates.Second(1)`.
 
+  * `Nullable{T}` has been deprecated and moved to the Nullables package:
+    use `Union{T, Void}` or `Union{Some{T}, Void}` instead. `isnull(x)` can be replaced
+    with `x === nothing` and `unsafe_get(x)` with `get(x)`.
+    `NullException` has been removed ([#23642]).
+
 Command-line option changes
 ---------------------------
 

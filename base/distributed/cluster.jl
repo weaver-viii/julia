@@ -21,7 +21,7 @@ mutable struct WorkerConfig
     tunnel::Union{Some{Bool}, Void}
     bind_addr::Union{Some{<:AbstractString}, Void}
     sshflags::Union{Some{Cmd}, Void}
-    max_parallel::Union{Some{Integer}, Void}
+    max_parallel::Union{Some{<:Integer}, Void}
 
     # Used by Local/SSH managers
     connect_at::Union{Some{<:Any}, Void}
