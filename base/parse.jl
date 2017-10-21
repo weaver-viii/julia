@@ -239,10 +239,8 @@ function tryparse(::Type{Float32}, s::SubString{String})
 end
 tryparse(::Type{T}, s::AbstractString) where {T<:Union{Float32,Float64}} = tryparse(T, String(s))
 
-function tryparse(::Type{Float16}, s::AbstractString)
-    res = tryparse(Float32, s)
-    res === nothing ? nothing : convert(Some{Float16}, res)
-end
+tryparse(::Type{Float16}, s::AbstractString) =
+    convert(Union{Some{Float16}, Void}, tryparse(Float32, s))
 
 function parse(::Type{T}, s::AbstractString) where T<:AbstractFloat
     result = tryparse(T, s)

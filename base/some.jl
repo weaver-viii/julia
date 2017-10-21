@@ -20,6 +20,7 @@ promote_rule(::Type{Some{S}}, ::Type{Some{T}}) where {S,T} = Some{promote_type(S
 promote_rule(::Type{Some{T}}, ::Type{Void}) where {T} = Union{Some{T}, Void}
 
 convert(::Type{Some{T}}, x::Some) where {T} = Some{T}(convert(T, x.value))
+convert(::Type{Union{Some{T}, Void}}, x::Some) where {T} = convert(Some{T}, x)
 
 function show(io::IO, x::Some)
     if get(io, :compact, false)

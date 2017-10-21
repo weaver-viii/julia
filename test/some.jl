@@ -20,7 +20,7 @@
 @test convert(Some, Some(1)) === convert(Union{Some, Void}, Some(1)) === Some(1)
 @test convert(Some{Int}, Some(1)) === convert(Union{Some{Int}, Void}, Some(1)) === Some(1)
 @test convert(Some{Int}, Some(1.0)) === Some(1)
-@test_throws MethodError convert(Union{Some{Int}, Void}, Some(1.0))
+@test convert(Union{Some{Int}, Void}, Some(1.0)) === Some(1)
 
 @test_throws MethodError convert(Some, nothing)
 @test_throws MethodError convert(Some{Int}, nothing)
