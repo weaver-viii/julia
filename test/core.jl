@@ -122,6 +122,17 @@ end
 @test typejoin(Tuple{Vararg{Int,2}}, Tuple{Int,Int,Int}) === Tuple{Int,Int,Vararg{Int}}
 @test typejoin(Tuple{Vararg{Int,2}}, Tuple{Vararg{Int}}) === Tuple{Vararg{Int}}
 
+# typejoin returns a Union only with Void combined with concrete types
+@test typejoin(Int, Float64) === Real
+@test typejoin(Int, Void) === Union{Int, Void}
+@test typejoin(Void, String) === Union{Void, String}
+@test typejoin(Vector{Int}, Void) === Union{Vector{Int}, Void}
+@test typejoin(Vector, Void) === Any
+@test typejoin(Real, Void) === Any
+@test typejoin(Int, String) === Any
+@test typejoin(Int, Union{Float64, Void}) === Any
+@test typejoin(Int, Union{String, Void}) === Any
+
 @test promote_type(Bool,Bottom) === Bool
 
 # type declarations
