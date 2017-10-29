@@ -39,17 +39,17 @@ function choosetests(choices = [])
         "bigfloat", "sorting", "statistics", "spawn", "backtrace",
         "file", "read", "version", "resolve", "namedtuple",
         "mpfr", "broadcast", "complex", "socket",
-        "floatapprox", "stdlib", "reflection", "regex", "float16",
+        "floatapprox", "reflection", "regex", "float16",
         "combinatorics", "sysinfo", "env", "rounding", "ranges", "mod2pi",
         "euler", "show", "lineedit", "replcompletions", "repl",
         "replutil", "sets", "goto", "llvmcall", "llvmcall2", "grisu",
         "nullable", "meta", "stacktraces", "libgit2", "docs",
         "markdown", "serialize", "misc", "threads",
         "enums", "cmdlineargs", "i18n", "workspace", "libdl", "int",
-        "checked", "bitset", "floatfuncs", "compile", "distributed", "inline",
+        "checked", "bitset", "floatfuncs", "compile", "inline",
         "boundscheck", "error", "ambiguous", "cartesian", "asmvariant", "osutils",
         "channels", "iostream", "specificity", "codegen", "codevalidation",
-        "reinterpretarray"
+        "reinterpretarray", "asyncmap", "stdlib"
     ]
 
     if isdir(joinpath(JULIA_HOME, Base.DOCDIR, "examples"))
@@ -158,7 +158,7 @@ function choosetests(choices = [])
         prepend!(tests, ["ambiguous"])
     end
 
-    net_required_for = ["socket", "distributed", "libgit2"]
+    net_required_for = ["socket", "libgit2"]
     net_on = true
     try
         ipa = getipaddr()

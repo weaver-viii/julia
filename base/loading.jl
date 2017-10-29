@@ -295,18 +295,19 @@ then tries paths in the global array `LOAD_PATH`. `require` is case-sensitive on
 all platforms, including those with case-insensitive filesystems like macOS and
 Windows.
 """
+
+myid() = isdefined(Main, :Distributed) ? invokelatest(Main.Distributed.myid) : 1
+nprocs() = isdefined(Main, :Distributed) ? invokelatest(Main.Distributed.nprocs) : 1
+
 function require(mod::Symbol)
     if !root_module_exists(mod)
         _require(mod)
         # After successfully loading, notify downstream consumers
         if toplevel_load[] && myid() == 1 && nprocs() > 1
             # broadcast top-level import/using from node 1 (only)
-            @sync for p in procs()
+            @sync for p in invokelatest(Main.procs)
                 p == 1 && continue
-                @async remotecall_wait(p) do
-                    require(mod)
-                    nothing
-                end
+                @async invokelatest(Main.remotecall_wait, ()->(require(mod); nothing), p)
             end
         end
         for callback in package_callbacks

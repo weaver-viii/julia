@@ -144,6 +144,7 @@ for N in [0,10]
     @test ref[] == nth
 
     # channeled_tasks
+    using Distributed
     for T in [Any, Int]
         chnls, tasks = Base.channeled_tasks(2, (c1,c2)->(assert(take!(c1)==1); put!(c2,2)); ctypes=[T,T], csizes=[N,N])
         put!(chnls[1], 1)

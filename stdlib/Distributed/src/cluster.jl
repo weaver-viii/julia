@@ -885,6 +885,8 @@ function _rmprocs(pids, waitfor)
 end
 
 
+struct ProcessExitedException <: Exception end
+
 """
     ProcessExitedException()
 
@@ -892,7 +894,6 @@ After a client Julia process has exited, further attempts to reference the dead 
 throw this exception.
 """
 ProcessExitedException()
-struct ProcessExitedException <: Exception end
 
 worker_from_id(i) = worker_from_id(PGRP, i)
 function worker_from_id(pg::ProcessGroup, i)
@@ -1118,3 +1119,43 @@ function init_parallel()
 end
 
 write_cookie(io::IO) = write(io.in, string(cluster_cookie(), "\n"))
+
+function process_opts(opts)
+    # startup worker.
+    # opts.startupfile, opts.load, etc should should not be processed for workers.
+    if opts.worker == 1
+        # does not return
+        if opts.cookie != C_NULL
+            start_worker(unsafe_string(opts.cookie))
+        else
+            start_worker()
+        end
+    end
+
+    # add processors
+    if opts.nprocs > 0
+        addprocs(opts.nprocs)
+    end
+
+    # load processes from machine file
+    if opts.machinefile != C_NULL
+        addprocs(load_machine_file(unsafe_string(opts.machinefile)))
+    end
+    return nothing
+end
+
+
+function load_machine_file(path::AbstractString)
+    machines = []
+    for line in split(read(path, String),'\n'; keep=false)
+        s = split(line, '*'; keep = false)
+        map!(strip, s, s)
+        if length(s) > 1
+            cnt = isnumber(s[1]) ? parse(Int,s[1]) : Symbol(s[1])
+            push!(machines,(s[2], cnt))
+        else
+            push!(machines,line)
+        end
+    end
+    return machines
+end

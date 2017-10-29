@@ -410,9 +410,6 @@ using .SparseArrays
 
 include("asyncmap.jl")
 
-include("distributed/Distributed.jl")
-using .Distributed
-
 # worker threads
 include("threadcall.jl")
 
@@ -455,7 +452,6 @@ function __init__()
     Multimedia.reinit_displays() # since Multimedia.displays uses STDOUT as fallback
     early_init()
     init_load_path()
-    Distributed.init_parallel()
     init_threadcall()
 end
 
@@ -473,6 +469,7 @@ unshift!(Base._included_files, (@__MODULE__, joinpath(@__DIR__, "sysimg.jl")))
 # load some stdlib packages but don't put their names in Main
 Base.require(:DelimitedFiles)
 Base.require(:Test)
+Base.require(:Distributed)
 
 empty!(LOAD_PATH)
 

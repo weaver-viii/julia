@@ -1,6 +1,6 @@
 # This file is a part of Julia. License is MIT: https://julialang.org/license
 
-using Test
+using Test, Distributed
 
 import Base: root_module
 
@@ -602,7 +602,7 @@ let
             @eval using $ModuleB
             uuid = Base.module_uuid(root_module(ModuleB))
             for wid in test_workers
-                @test Base.Distributed.remotecall_eval(Main, wid, :( Base.module_uuid(Base.root_module($(QuoteNode(ModuleB)))) )) == uuid
+                @test Distributed.remotecall_eval(Main, wid, :( Base.module_uuid(Base.root_module($(QuoteNode(ModuleB)))) )) == uuid
                 if wid != myid() # avoid world-age errors on the local proc
                     @test remotecall_fetch(g, wid) == wid
                 end

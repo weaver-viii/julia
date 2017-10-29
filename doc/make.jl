@@ -28,6 +28,7 @@ if Sys.iswindows()
     cp_q("../stdlib/Profile/docs/src/index.md", "src/stdlib/profile.md")
     cp_q("../stdlib/Base64/docs/src/index.md", "src/stdlib/base64.md")
     cp_q("../stdlib/FileWatching/docs/src/index.md", "src/stdlib/filewatching.md")
+    cp_q("../stdlib/Distributed/docs/src/index.md", "src/stdlib/distributed.md")
 else
     symlink_q("../../../stdlib/DelimitedFiles/docs/src/index.md", "src/stdlib/delimitedfiles.md")
     symlink_q("../../../stdlib/Test/docs/src/index.md", "src/stdlib/test.md")
@@ -36,6 +37,7 @@ else
     symlink_q("../../../stdlib/Profile/docs/src/index.md", "src/stdlib/profile.md")
     symlink_q("../../../stdlib/Base64/docs/src/index.md", "src/stdlib/base64.md")
     symlink_q("../../../stdlib/FileWatching/docs/src/index.md", "src/stdlib/filewatching.md")
+    symlink_q("../../../stdlib/Distributed/docs/src/index.md", "src/stdlib/distributed.md")
 end
 
 const PAGES = [
@@ -88,6 +90,7 @@ const PAGES = [
         "stdlib/strings.md",
         "stdlib/arrays.md",
         "stdlib/parallel.md",
+        "stdlib/distributed.md",
         "stdlib/linalg.md",
         "stdlib/constants.md",
         "stdlib/file.md",
