@@ -941,23 +941,28 @@ function testset_beginend(args, tests, source)
     # finally removing the testset and giving it a chance to take
     # action (such as reporting the results)
     quote
-        # GLOBAL_RNG is re-seeded with its own seed to ease reproduce a failed test
-        guardsrand(Base.GLOBAL_RNG.seed) do
-            ts = $(testsettype)($desc; $options...)
-            # this empty loop is here to force the block to be compiled,
-            # which is needed for backtrace scrubbing to work correctly.
-            while false; end
-            push_testset(ts)
-            try
-                $(esc(tests))
-            catch err
-                # something in the test block threw an error. Count that as an
-                # error in this test set
-                record(ts, Error(:nontest_error, :(), err, catch_backtrace(), $(QuoteNode(source))))
-            end
-            pop_testset()
-            finish(ts)
+        ts = $(testsettype)($desc; $options...)
+        # this empty loop is here to force the block to be compiled,
+        # which is needed for backtrace scrubbing to work correctly.
+        while false; end
+        push_testset(ts)
+        # we reproduce the logic of guardsrand, but this function
+        # cannot be used as it changes slightly the semantic of @testset,
+        # by wrapping the body in a function
+        oldrng = copy(Base.GLOBAL_RNG)
+        try
+            # GLOBAL_RNG is re-seeded with its own seed to ease reproduce a failed test
+            srand(Base.GLOBAL_RNG.seed)
+            $(esc(tests))
+        catch err
+            # something in the test block threw an error. Count that as an
+            # error in this test set
+            record(ts, Error(:nontest_error, :(), err, catch_backtrace(), $(QuoteNode(source))))
+        finally
+            copy!(Base.GLOBAL_RNG, oldrng)
         end
+        pop_testset()
+        finish(ts)
     end
 end
 
@@ -1001,23 +1006,25 @@ function testset_forloop(args, testloop, source)
     # wrapped in the outer loop provided by the user
     tests = testloop.args[2]
     blk = quote
-        guardsrand(Base.GLOBAL_RNG.seed) do
-            # Trick to handle `break` and `continue` in the test code before
-            # they can be handled properly by `finally` lowering.
-            if !first_iteration
-                pop_testset()
-                push!(arr, finish(ts))
-            end
-            ts = $(testsettype)($desc; $options...)
-            push_testset(ts)
-            first_iteration = false
-            try
-                $(esc(tests))
-            catch err
-                # Something in the test block threw an error. Count that as an
-                # error in this test set
-                record(ts, Error(:nontest_error, :(), err, catch_backtrace(), $(QuoteNode(source))))
-            end
+        # Trick to handle `break` and `continue` in the test code before
+        # they can be handled properly by `finally` lowering.
+        if !first_iteration
+            pop_testset()
+            push!(arr, finish(ts))
+        end
+        ts = $(testsettype)($desc; $options...)
+        push_testset(ts)
+        first_iteration = false
+        oldrng = copy(Base.GLOBAL_RNG)
+        try
+            srand(Base.GLOBAL_RNG.seed)
+            $(esc(tests))
+        catch err
+            # Something in the test block threw an error. Count that as an
+            # error in this test set
+            record(ts, Error(:nontest_error, :(), err, catch_backtrace(), $(QuoteNode(source))))
+        finally
+            copy!(Base.GLOBAL_RNG, oldrng)
         end
     end
     quote

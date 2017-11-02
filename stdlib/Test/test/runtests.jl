@@ -286,7 +286,7 @@ end
             end
             @testset "some loops fail" begin
                 @testset for i in 1:5
-                    @test i <= rand(1:3)
+                    @test i <= 4
                 end
                 # should add 3 errors and 3 passing tests
                 @testset for i in 1:6
@@ -651,7 +651,8 @@ end
      rm(f; force=true)
  end
 
-@testset "@testset is wrapped in a `guardsrand` block" begin
+@testset "@testset preserves GLOBAL_RNG's state, and re-seeds it" begin
+    # i.e. it behaves as if it was wrapped in a `guardsrand(GLOBAL_RNG.seed)` block
     seed = rand(UInt128)
     srand(seed)
     a = rand()

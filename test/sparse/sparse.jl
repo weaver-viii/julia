@@ -426,8 +426,7 @@ end
         @test_throws ArgumentError permute!(A, p, (r = copy(q); r[2] = n + 1; r))
     end
     @testset "overall functionality of [c]transpose[!] and permute[!]" begin
-        for (_m, _n) in ((smalldim, smalldim), (smalldim, largedim), (largedim, smalldim))
-            m, n = _m, _n # to avoid overwriting variables from above in the for loop
+        for (m, n) in ((smalldim, smalldim), (smalldim, largedim), (largedim, smalldim))
             A = sprand(m, n, nzprob)
             At = transpose(A)
             # transpose[!]
