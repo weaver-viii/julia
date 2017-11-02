@@ -453,27 +453,26 @@ function string(a::Union{String,Char}...)
 end
 
 function reverse(s::String)
-    dat = Vector{UInt8}(s)
-    n = length(dat)
+    n = sizeof(s)
     n <= 1 && return s
     buf = StringVector(n)
     out = n
     pos = 1
     @inbounds while out > 0
-        ch = dat[pos]
+        ch = codeunit(s, pos)
         if ch > 0xdf
             if ch < 0xf0
                 (out -= 3) < 0 && throw(UnicodeError(UTF_ERR_SHORT, pos, ch))
-                buf[out + 1], buf[out + 2], buf[out + 3] = ch, dat[pos + 1], dat[pos + 2]
+                buf[out + 1], buf[out + 2], buf[out + 3] = ch, codeunit(s, pos + 1), codeunit(s, pos + 2)
                 pos += 3
             else
                 (out -= 4) < 0 && throw(UnicodeError(UTF_ERR_SHORT, pos, ch))
-                buf[out+1], buf[out+2], buf[out+3], buf[out+4] = ch, dat[pos+1], dat[pos+2], dat[pos+3]
+                buf[out+1], buf[out+2], buf[out+3], buf[out+4] = ch, codeunit(s, pos+1), codeunit(s, pos+2), codeunit(s, pos+3)
                 pos += 4
             end
         elseif ch > 0x7f
             (out -= 2) < 0 && throw(UnicodeError(UTF_ERR_SHORT, pos, ch))
-            buf[out + 1], buf[out + 2] = ch, dat[pos + 1]
+            buf[out + 1], buf[out + 2] = ch, codeunit(s, pos + 1)
             pos += 2
         else
             buf[out] = ch
