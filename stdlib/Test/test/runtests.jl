@@ -650,3 +650,21 @@ end
 
      rm(f; force=true)
  end
+
+@testset "@testset is wrapped in a `guardsrand` block" begin
+    seed = rand(UInt128)
+    srand(seed)
+    a = rand()
+    @testset begin
+        # global RNG must re-seeded at the beginning of @testset
+        @test a == rand()
+    end
+    @testset for i=1:3
+        @test a == rand()
+    end
+    # the @testset's above must have no consequence for rand() below
+    b = rand()
+    srand(seed)
+    @test a == rand()
+    @test b == rand()
+end
