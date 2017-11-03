@@ -41,7 +41,7 @@
   * [Noteworthy Differences from other Languages](@ref)
   * [Unicode Input](@ref)
 
-## Standard Library
+## Base 
 
   * [Essentials](@ref)
   * [Collections and Data Structures](@ref)
@@ -53,24 +53,27 @@
   * [Linear Algebra](@ref)
   * [Constants](@ref lib-constants)
   * [Filesystem](@ref)
-  * [Delimited Files](@ref)
   * [I/O and Network](@ref)
   * [Punctuation](@ref)
   * [Sorting and Related Functions](@ref)
   * [Package Manager Functions](@ref)
   * [Dates and Time](@ref stdlib-dates)
   * [Iteration utilities](@ref)
-  * [Unit Testing](@ref)
   * [C Interface](@ref)
   * [C Standard Library](@ref)
   * [Dynamic Linker](@ref)
   * [StackTraces](@ref)
   * [SIMD Support](@ref)
-  * [Profiling](@ref lib-profiling)
+
+## Standard Library
+
+  * [Unit Testing](@ref)
   * [Memory-mapped I/O](@ref)
   * [Shared Arrays](@ref)
   * [Base64](@ref)
   * [File Events](@ref lib-filewatching)
+  * [Delimited Files](@ref)
+  * [Profiling](@ref lib-profiling)
 
 ## Developer Documentation
 
