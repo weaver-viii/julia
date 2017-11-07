@@ -22,6 +22,10 @@ promote_rule(::Type{Some{T}}, ::Type{Void}) where {T} = Union{Some{T}, Void}
 convert(::Type{Some{T}}, x::Some) where {T} = Some{T}(convert(T, x.value))
 convert(::Type{Union{Some{T}, Void}}, x::Some) where {T} = convert(Some{T}, x)
 
+convert(::Type{Union{T, Void}}, x::Any) where {T} = convert(T, x)
+convert(::Type{Void}, x::Any) = throw(MethodError(convert, (Void, x)))
+convert(::Type{Void}, x::Void) = nothing
+
 function show(io::IO, x::Some)
     if get(io, :compact, false)
         show(io, x.value)

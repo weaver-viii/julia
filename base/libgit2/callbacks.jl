@@ -187,8 +187,8 @@ function authenticate_userpass(libgit2credptr::Ptr{Ptr{Void}}, p::CredentialPayl
     if p.use_git_helpers && (!revised || !isfilled(cred))
         git_cred = GitCredential(p.config, p.url)
 
-        cred.user = Base.get(git_cred.username, "")
-        cred.pass = Base.get(git_cred.password, "")
+        cred.user = git_cred.username === nothing ? "" : git_cred.username
+        cred.pass = git_cred.password === nothing ? "" : git_cred.password
         revised = true
 
         p.use_git_helpers = false

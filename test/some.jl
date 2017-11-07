@@ -34,6 +34,12 @@
 @test convert(Union{Some, Void}, nothing) === nothing
 @test convert(Union{Some{Int}, Void}, nothing) === nothing
 
+@test convert(Union{Int, Void}, nothing) === nothing
+@test convert(Union{Int, Void}, 1) === 1
+@test convert(Union{Int, Void}, 1.0) === 1
+@test convert(Void, nothing) === nothing
+@test_throws MethodError convert(Void, 1)
+
 ## show()
 
 @test sprint(show, Some(1)) == "Some(1)"

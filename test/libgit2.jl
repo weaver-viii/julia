@@ -370,7 +370,7 @@ end
         @test cred.use_http_path
         cred.use_http_path = false
 
-        @test get(cred.path, "") == "dir/file"
+        @test cred.path == "dir/file"
         @test sprint(write, cred) == expected
     end
 
@@ -1568,19 +1568,18 @@ mktempdir() do dir
                 # No credential settings in configuration.
                 cred = LibGit2.GitCredential("https", "github.com")
                 username = LibGit2.default_username(cfg, cred)
-                @test isnull(username)
+                @test username === nothing
 
                 # Add a credential setting for a specific for a URL
                 LibGit2.set!(cfg, "credential.https://github.com.username", "foo")
 
                 cred = LibGit2.GitCredential("https", "github.com")
                 username = LibGit2.default_username(cfg, cred)
-                @test !isnull(username)
-                @test get(username) == "foo"
+                @test username == "foo"
 
                 cred = LibGit2.GitCredential("https", "mygithost")
                 username = LibGit2.default_username(cfg, cred)
-                @test isnull(username)
+                @test username === nothing
 
                 # Add a global credential setting after the URL specific setting. The first
                 # setting to match will be the one that is used.
@@ -1588,13 +1587,11 @@ mktempdir() do dir
 
                 cred = LibGit2.GitCredential("https", "github.com")
                 username = LibGit2.default_username(cfg, cred)
-                @test !isnull(username)
-                @test get(username) == "foo"
+                @test username == "foo"
 
                 cred = LibGit2.GitCredential("https", "mygithost")
                 username = LibGit2.default_username(cfg, cred)
-                @test !isnull(username)
-                @test get(username) == "bar"
+                @test username == "bar"
             end
         end
 
@@ -1612,13 +1609,11 @@ mktempdir() do dir
 
                 cred = LibGit2.GitCredential("https", "github.com")
                 username = LibGit2.default_username(cfg, cred)
-                @test !isnull(username)
-                @test get(username) == ""
+                @test username == ""
 
                 cred = LibGit2.GitCredential("https", "mygithost", "path")
                 username = LibGit2.default_username(cfg, cred)
-                @test !isnull(username)
-                @test get(username) == "name"
+                @test username == "name"
             end
         end
     end
@@ -1757,7 +1752,7 @@ mktempdir() do dir
 
                         function without_path(cred)
                             c = deepcopy(cred)
-                            c.path = Nullable()
+                            c.path = nothing
                             c
                         end
 
@@ -2126,7 +2121,7 @@ mktempdir() do dir
                     include($LIBGIT2_HELPER_PATH)
                     payload = CredentialPayload(allow_prompt=false, allow_ssh_agent=true,
                                                 allow_git_helpers=false)
-                    credential_loop($valid_cred, $url, Some($username), payload)
+                    credential_loop($valid_cred, $url, $username, payload)
                 end
             end
 
@@ -2405,10 +2400,9 @@ mktempdir() do dir
             https_ex = quote
                 include($LIBGIT2_HELPER_PATH)
                 LibGit2.with(LibGit2.GitConfig($config_path, LibGit2.Consts.CONFIG_LEVEL_APP)) do cfg
-                    payload = CredentialPayload(Nullable{AbstractCredentials}(),
-                                                Nullable{CachedCredentials}(), cfg,
+                    payload = CredentialPayload(nothing, nothing, cfg,
                                                 allow_git_helpers=true)
-                    credential_loop($valid_cred, $url, Nullable{String}(), payload)
+                    credential_loop($valid_cred, $url, nothing, payload)
                 end
             end
 
