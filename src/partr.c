@@ -32,6 +32,9 @@ extern jl_sym_t *done_sym;
 extern jl_sym_t *failed_sym;
 extern jl_sym_t *runnable_sym;
 
+// task/stack switch functions used
+extern void init_task_entry(void (*task_entry)(void), jl_task_t *t, char *stack);
+
 // multiq
 // ---
 
@@ -406,19 +409,12 @@ void jl_threadfun(void *arg)
 {
     jl_threadarg_t *targ = (jl_threadarg_t *)arg;
 
-    // initialize this thread (set tid, create heap, etc.)
+    // initialize this thread (set tid, create heap, set up root task)
     jl_init_threadtls(targ->tid);
     jl_init_stack_limits(0);
-
-    jl_ptls_t ptls = jl_get_ptls_states();
-
-    // set up tasking
-    jl_init_root_task(ptls->stack_lo, ptls->stack_hi - ptls->stack_lo);
-#ifdef COPY_STACKS
-    jl_set_base_ctx((char*)&arg);
-#endif
-
     init_started_thread();
+    jl_ptls_t ptls = jl_get_ptls_states();
+    jl_init_root_task(ptls->stack_lo, ptls->stack_hi - ptls->stack_lo);
 
     // Assuming the functions called below don't contain unprotected GC
     // critical region. In general, the following part of this function
@@ -518,10 +514,11 @@ static void sync_grains(jl_task_t *task)
 }
 
 
-// start the task if it is new, or switch to it
-static jl_value_t *resume(jl_task_t *task)
+// all tasks except the root task start and exit here
+static void NOINLINE JL_NORETURN task_wrapper()
 {
     jl_ptls_t ptls = jl_get_ptls_states();
+    jl_task_t *task = ptls->current_task;
 
     // GC safe
     uint32_t nargs;
@@ -535,6 +532,35 @@ static jl_value_t *resume(jl_task_t *task)
         args = jl_svec_data(task->args);
     }
 
+    task->started = 1;
+    JL_TRY {
+        if (ptls->defer_signal) {
+            ptls->defer_signal = 0;
+            jl_sigint_safepoint(ptls);
+        }
+        JL_TIMING(ROOT);
+        ptls->world_age = jl_world_counter;
+        (void)jl_assume(fptr->jlcall_api != JL_API_CONST);
+        task->result = jl_call_fptr_internal(&task->fptr, task->mfunc, args, nargs);
+        jl_gc_wb(task, task->result);
+        task->state = done_sym;
+    }
+    JL_CATCH {
+        task->exception = ptls->exception_in_transit;
+        jl_gc_wb(task, task->exception);
+        task->state = failed_sym;
+    }
+
+    /* grain tasks must synchronize */
+    if (task->grain_num >= 0)
+        sync_grains(task);
+
+    /* clear state */
+    ptls->in_finalizer = 0;
+    ptls->in_pure_callback = 0;
+    jl_get_ptls_states()->world_age = jl_world_counter;
+
+#if 0
     // TODO: before we support getting return value from
     //       the work, and after we have proper GC transition
     //       support in the codegen and runtime we don't need to
@@ -551,12 +577,10 @@ static jl_value_t *resume(jl_task_t *task)
     }
 
     jl_gc_unsafe_leave(ptls, gc_state);
+#endif
 
-    /* grain tasks must synchronize */
-    if (task->grain_num >= 0)
-        sync_grains(task);
-
-    return result;
+    gc_debug_critical_error();
+    abort();
 }
 
 
@@ -669,24 +693,11 @@ static jl_task_t *new_task(jl_value_t *_args)
         return NULL;
     task->result = jl_nothing;
 
-    // set up stack with guard page
-    jl_GC_PUSH1(&task);
-    task->ssize = LLT_ALIGN(1*1024*1024, jl_page_size);
-    size_t stkbufsize = ssize + jl_page_size + (jl_page_size - 1);
-    task->stkbuf = (void *)jl_gc_alloc_buf(ptls, stkbufsize);
-    jl_gc_wb_buf(task, task->stkbuf, stkbufsize);
-    char *stk = (char *)LLT_ALIGN((uintptr_t)task->stkbuf, jl_page_size);
-    if (mprotect(stk, jl_page_size - 1, PROT_NONE) == -1)
-        jl_errorf("mprotect: %s", strerror(errno));
-    stk += jl_page_size;
-    // TODO: init_task(task, stk);
-    jl_gc_add_finalizer((jl_value_t *)task, jl_unprotect_stack_func);
-    JL_GC_POP();
-
     // initialize elements
     task->next = NULL;
     task->storage = jl_nothing;
     task->state = runnable_sym;
+    task->started = 0;
     task->consumers = jl_nothing;
     task->donenotify = jl_nothing;
     task->exception = jl_nothing;
@@ -694,8 +705,7 @@ static jl_task_t *new_task(jl_value_t *_args)
     task->eh = NULL;
     arraylist_new(&task->locks, 0);
     task->gcstack = NULL;
-
-    task->current_module = ptls->current_module;
+    task->current_module = NULL;
     task->world_age = ptls->world_age;
     task->curr_tid = -1;
     task->sticky_tid = -1;
@@ -708,6 +718,24 @@ static jl_task_t *new_task(jl_value_t *_args)
     task->timing_stack = NULL;
 #endif
 
+    // set up stack with guard page
+    JL_GC_PUSH1(&task);
+    task->ssize = LLT_ALIGN(1*1024*1024, jl_page_size);
+    size_t stkbufsize = ssize + jl_page_size + (jl_page_size - 1);
+    task->stkbuf = (void *)jl_gc_alloc_buf(ptls, stkbufsize);
+    jl_gc_wb_buf(task, task->stkbuf, stkbufsize);
+    char *stk = (char *)LLT_ALIGN((uintptr_t)task->stkbuf, jl_page_size);
+    if (mprotect(stk, jl_page_size - 1, PROT_NONE) == -1)
+        jl_errorf("mprotect: %s", strerror(errno));
+    stk += jl_page_size;
+
+    // set up entry point for this task
+    init_task_entry(task_wrapper, task, stk);
+
+    // for task cleanup
+    jl_gc_add_finalizer((jl_value_t *)task, jl_unprotect_stack_func);
+
+    JL_GC_POP();
     return task;
 }
 
