@@ -235,15 +235,14 @@ function head!(repo::GitRepo, ref::GitReference)
 end
 
 """
-    lookup_branch(repo::GitRepo, branch_name::AbstractString, remote::Bool=false) -> Union{Some{GitReference}, Void}
+    lookup_branch(repo::GitRepo, branch_name::AbstractString, remote::Bool=false) -> Union{GitReference, Void}
 
 Determine if the branch specified by `branch_name` exists in the repository `repo`.
 If `remote` is `true`, `repo` is assumed to be a remote git repository. Otherwise, it
 is part of the local filesystem.
 
-`lookup_branch` returns either a [`Some`](@ref) object, or [`nothing`](@ref) if
-the requested branch does not exist yet. If the branch does exist, the `Some` wrapper
-contains a `GitReference` to the branch.
+`lookup_branch` returns either a `GitReference` to the requested branch
+if it exists, or [`nothing`](@ref) if not.
 """
 function lookup_branch(repo::GitRepo,
                        branch_name::AbstractString,
@@ -262,18 +261,16 @@ function lookup_branch(repo::GitRepo,
         end
         throw(Error.GitError(err))
     end
-    return Some(GitReference(repo, ref_ptr_ptr[]))
+    return GitReference(repo, ref_ptr_ptr[])
 end
 
 """
-    upstream(ref::GitReference) -> Union{Some{GitReference}, Void}
+    upstream(ref::GitReference) -> Union{GitReference, Void}
 
 Determine if the branch containing `ref` has a specified upstream branch.
 
-`upstream` returns either a [`Some`](@ref) object, or [`nothing`](@ref) if
-the requested branch does not have an upstream counterpart. If
-the upstream branch does exist, the `Some` wrapper
-contains a `GitReference` to the upstream branch.
+`upstream` returns either a `GitReference` to the upstream branch if it exists,
+or [`nothing`](@ref) if the requested branch does not have an upstream counterpart.
 """
 function upstream(ref::GitReference)
     isempty(ref) && return nothing
@@ -289,7 +286,7 @@ function upstream(ref::GitReference)
         end
         throw(Error.GitError(err))
     end
-    return Some(GitReference(ref.owner, ref_ptr_ptr[]))
+    return GitReference(ref.owner, ref_ptr_ptr[])
 end
 
 repository(ref::GitReference) = ref.owner
