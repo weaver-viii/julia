@@ -2097,6 +2097,12 @@ end
     @deprecate chol!(x::Number, uplo) chol(x) false
 end
 
+@eval LibGit2 begin
+    @deprecate AbstractCredentials AbstractCredential false
+    @deprecate UserPasswordCredentials UserPasswordCredential false
+    @deprecate SSHCredentials SSHCredential false
+end
+
 # END 0.7 deprecations
 
 # BEGIN 1.0 deprecations
