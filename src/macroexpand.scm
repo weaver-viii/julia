@@ -304,9 +304,9 @@
                              ((assignment? arg)
                               `(global
                                 (= ,(unescape (cadr arg))
-                                   ,(resolve-expansion-vars-with-new-env (caddr arg) env m inarg))))
+                                   ,(resolve-expansion-vars-with-new-env (caddr arg) env m parent-scope inarg))))
                              (else
-                              `(global ,(resolve-expansion-vars-with-new-env arg env m inarg))))))
+                              `(global ,(resolve-expansion-vars-with-new-env arg env m parent-scope inarg))))))
            ((using import importall export meta line inbounds boundscheck simdloop gc_preserve gc_preserve_end) (map unescape e))
            ((macrocall) e) ; invalid syntax anyways, so just act like it's quoted.
            ((symboliclabel) e)
@@ -399,11 +399,6 @@
   (if (and (pair? e) (eq? (car e) 'tuple))
       (apply append (map decl-vars* (cdr e)))
       (list (decl-var* e))))
-
-(define (function-def? e)
-  (and (pair? e) (or (eq? (car e) 'function) (eq? (car e) '->)
-                     (and (eq? (car e) '=) (length= e 3)
-                          (eventually-call? (cadr e))))))
 
 ;; count hygienic / escape pairs
 ;; and fold together a list resulting from applying the function to

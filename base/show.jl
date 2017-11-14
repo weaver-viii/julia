@@ -524,8 +524,8 @@ show(io::IO, s::Symbol) = show_unquoted_quote_expr(io, s, 0, 0)
 #   show_unquoted(io, ex) does the heavy lifting
 #
 # AST printing should follow two rules:
-#   1. parse(string(ex)) == ex
-#   2. eval(parse(repr(ex))) == ex
+#   1. Meta.parse(string(ex)) == ex
+#   2. eval(Meta.parse(repr(ex))) == ex
 #
 # Rule 1 means that printing an expression should generate Julia code which
 # could be reparsed to obtain the original expression. This code should be
@@ -536,8 +536,8 @@ show(io::IO, s::Symbol) = show_unquoted_quote_expr(io, s, 0, 0)
 # original expression.
 #
 # This is consistent with many other show methods, i.e.:
-#   show(Set([1,2,3]))                # ==> "Set{Int64}([2,3,1])"
-#   eval(parse("Set{Int64}([2,3,1])”) # ==> An actual set
+#   show(Set([1,2,3]))                     # ==> "Set{Int64}([2,3,1])"
+#   eval(Meta.parse("Set{Int64}([2,3,1])”) # ==> An actual set
 # While this isn’t true of ALL show methods, it is of all ASTs.
 
 const ExprNode = Union{Expr, QuoteNode, Slot, LineNumberNode,
@@ -669,7 +669,8 @@ julia> Base.operator_associativity(:⊗), Base.operator_associativity(:sin), Bas
 ```
 """
 function operator_associativity(s::Symbol)
-    if operator_precedence(s) in (prec_arrow, prec_assignment, prec_control_flow, prec_power) || isunaryoperator(s) && !is_unary_and_binary_operator(s)
+    if operator_precedence(s) in (prec_arrow, prec_assignment, prec_control_flow, prec_power) ||
+        (isunaryoperator(s) && !is_unary_and_binary_operator(s)) || s === :<|
         return :right
     elseif operator_precedence(s) in (0, prec_comparison) || s in (:+, :++, :*)
         return :none
@@ -1217,6 +1218,9 @@ function show_unquoted(io::IO, ex::Expr, indent::Int, prec::Int)
     elseif head === :meta && length(args) == 1 && args[1] === :pop_loc
         print(io, "# meta: pop location")
         show_type = false
+    elseif head === :meta && length(args) == 2 && args[1] === :pop_loc
+        print(io, "# meta: pop locations ($(args[2]))")
+        show_type = false
     # print anything else as "Expr(head, args...)"
     else
         if head !== :invoke
@@ -1512,18 +1516,60 @@ function dumpsubtypes(io::IO, x::DataType, m::Module, n::Int, indent)
 end
 
 
+const DUMP_DEFAULT_MAXDEPTH = 8
 # For abstract types, use _dumptype only if it's a form that will be called
 # interactively.
-dump(io::IO, x::DataType; maxdepth=8) = ((x.abstract ? dumptype : dump)(io, x, maxdepth, ""); println(io))
+dump(io::IO, x::DataType; maxdepth=DUMP_DEFAULT_MAXDEPTH) = ((x.abstract ? dumptype : dump)(io, x, maxdepth, ""); println(io))
 
-dump(io::IO, arg; maxdepth=8) = (dump(io, arg, maxdepth, ""); println(io))
+dump(io::IO, arg; maxdepth=DUMP_DEFAULT_MAXDEPTH) = (dump(io, arg, maxdepth, ""); println(io))
 
 """
-    dump(x)
+    dump(x; maxdepth=$DUMP_DEFAULT_MAXDEPTH)
 
 Show every part of the representation of a value.
+```jldoctest
+julia> struct MyStruct
+           x
+           y
+       end
+
+julia> x = MyStruct(1, (2,3));
+
+julia> dump(x)
+MyStruct
+  x: Int64 1
+  y: Tuple{Int64,Int64}
+    1: Int64 2
+    2: Int64 3
+```
+Nested data structures are truncated at `maxdepth`.
+```jldoctest
+julia> struct DeeplyNested
+           xs::Vector{DeeplyNested}
+       end;
+
+julia> x = DeeplyNested([]);
+
+julia> push!(x.xs, x);
+
+julia> dump(x)
+DeeplyNested
+  xs: Array{DeeplyNested}((1,))
+    1: DeeplyNested
+      xs: Array{DeeplyNested}((1,))
+        1: DeeplyNested
+          xs: Array{DeeplyNested}((1,))
+            1: DeeplyNested
+              xs: Array{DeeplyNested}((1,))
+                1: DeeplyNested
+
+julia> dump(x, maxdepth=2)
+DeeplyNested
+  xs: Array{DeeplyNested}((1,))
+    1: DeeplyNested
+```
 """
-dump(arg; maxdepth=8) = dump(IOContext(STDOUT::IO, :limit => true), arg; maxdepth=maxdepth)
+dump(arg; maxdepth=DUMP_DEFAULT_MAXDEPTH) = dump(IOContext(STDOUT::IO, :limit => true), arg; maxdepth=maxdepth)
 
 
 """
@@ -1926,7 +1972,7 @@ function show_nd(io::IO, a::AbstractArray, print_matrix, label_slices)
                 if length(ind) > 10
                     if ii == ind[4] && all(d->idxs[d]==first(tailinds[d]),1:i-1)
                         for j=i+1:nd
-                            szj = size(a,j+2)
+                            szj = length(indices(a, j+2))
                             indj = tailinds[j]
                             if szj>10 && first(indj)+2 < idxs[j] <= last(indj)-3
                                 @goto skip

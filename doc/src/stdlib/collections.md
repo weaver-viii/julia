@@ -40,13 +40,14 @@ Fully implemented by:
   * `Tuple`
   * `Number`
   * [`AbstractArray`](@ref)
-  * [`IntSet`](@ref)
+  * [`BitSet`](@ref)
   * [`ObjectIdDict`](@ref)
   * [`Dict`](@ref)
   * [`WeakKeyDict`](@ref)
   * `EachLine`
   * `AbstractString`
   * [`Set`](@ref)
+  * [`Pair`](@ref)
 
 ## General Collections
 
@@ -63,7 +64,7 @@ Fully implemented by:
   * `Tuple`
   * `Number`
   * [`AbstractArray`](@ref)
-  * [`IntSet`](@ref)
+  * [`BitSet`](@ref)
   * [`ObjectIdDict`](@ref)
   * [`Dict`](@ref)
   * [`WeakKeyDict`](@ref)
@@ -213,9 +214,9 @@ Fully implemented by:
 
 Partially implemented by:
 
-  * [`IntSet`](@ref)
+  * [`BitSet`](@ref)
   * [`Set`](@ref)
-  * [`EnvHash`](@ref Base.EnvHash)
+  * [`EnvDict`](@ref Base.EnvDict)
   * [`Array`](@ref)
   * [`BitArray`](@ref)
 
@@ -223,23 +224,23 @@ Partially implemented by:
 
 ```@docs
 Base.Set
-Base.IntSet
+Base.BitSet
 Base.union
 Base.union!
 Base.intersect
 Base.setdiff
 Base.setdiff!
 Base.symdiff
-Base.symdiff!(::IntSet, ::Integer)
-Base.symdiff!(::IntSet, ::Any)
-Base.symdiff!(::IntSet, ::IntSet)
+Base.symdiff!(::BitSet, ::Integer)
+Base.symdiff!(::BitSet, ::Any)
+Base.symdiff!(::BitSet, ::BitSet)
 Base.intersect!
 Base.issubset
 ```
 
 Fully implemented by:
 
-  * [`IntSet`](@ref)
+  * [`BitSet`](@ref)
   * [`Set`](@ref)
 
 Partially implemented by:
@@ -265,3 +266,9 @@ Fully implemented by:
 
   * `Vector` (a.k.a. 1-dimensional [`Array`](@ref))
   * `BitVector` (a.k.a. 1-dimensional [`BitArray`](@ref))
+
+## Utility Collections
+
+```@docs
+Base.Pair
+```

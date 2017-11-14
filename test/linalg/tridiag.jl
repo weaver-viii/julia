@@ -74,6 +74,7 @@ guardsrand(123) do
         end
         @testset "interconversion of Tridiagonal and SymTridiagonal" begin
             @test Tridiagonal(dl, d, dl) == SymTridiagonal(d, dl)
+            @test SymTridiagonal(d, dl) == Tridiagonal(dl, d, dl)
             @test Tridiagonal(dl, d, du) + Tridiagonal(du, d, dl) == SymTridiagonal(2d, dl+du)
             @test SymTridiagonal(d, dl) + Tridiagonal(dl, d, du) == Tridiagonal(dl + dl, d+d, dl+du)
             @test convert(SymTridiagonal,Tridiagonal(SymTridiagonal(d, dl))) == SymTridiagonal(d, dl)
@@ -124,7 +125,8 @@ guardsrand(123) do
                 end
                 @test isa(similar(A), mat_type{elty})
                 @test isa(similar(A, Int), mat_type{Int})
-                @test isa(similar(A, Int, (3, 2)), Matrix{Int})
+                @test isa(similar(A, (3, 2)), SparseMatrixCSC)
+                @test isa(similar(A, Int, (3, 2)), SparseMatrixCSC{Int})
                 @test size(A, 3) == 1
                 @test size(A, 1) == n
                 @test size(A) == (n, n)
@@ -151,14 +153,17 @@ guardsrand(123) do
                     @test_throws ArgumentError A[2, 3] = 1 # test assignment on the superdiagonal
                 end
             end
-            @testset "Diagonal extraction" begin
-                @test diag(A, 1) === (mat_type == Tridiagonal ? du : dl)
-                @test diag(A, -1) === dl
-                @test diag(A, 0) === d
-                @test diag(A) === d
-                @test diag(A, n - 1) == zeros(elty, 1)
+            @testset "diag" begin
+                @test (@inferred diag(A))::typeof(d) == d
+                @test (@inferred diag(A, 0))::typeof(d) == d
+                @test (@inferred diag(A, 1))::typeof(d) == (mat_type == Tridiagonal ? du : dl)
+                @test (@inferred diag(A, -1))::typeof(d) == dl
+                @test (@inferred diag(A, n-1))::typeof(d) == zeros(elty, 1)
                 @test_throws ArgumentError diag(A, -n - 1)
                 @test_throws ArgumentError diag(A, n + 1)
+                GA = mat_type == Tridiagonal ? mat_type(GenericArray.((dl, d, du))...) : mat_type(GenericArray.((d, dl))...)
+                @test (@inferred diag(GA))::typeof(GenericArray(d)) == GenericArray(d)
+                @test (@inferred diag(GA, -1))::typeof(GenericArray(d)) == GenericArray(dl)
             end
             @testset "Idempotent tests" begin
                 for func in (conj, transpose, adjoint)
@@ -201,10 +206,10 @@ guardsrand(123) do
                 @test Array(A/α) ≈ Array(A)/α
 
                 @testset "Matmul with Triangular types" begin
-                    @test A*Base.LinAlg.UnitUpperTriangular(eye(n)) ≈ fA*eye(n)
-                    @test A*Base.LinAlg.UnitLowerTriangular(eye(n)) ≈ fA*eye(n)
-                    @test A*UpperTriangular(eye(n)) ≈ fA*eye(n)
-                    @test A*LowerTriangular(eye(n)) ≈ fA*eye(n)
+                    @test A*Base.LinAlg.UnitUpperTriangular(eye(n)) ≈ fA
+                    @test A*Base.LinAlg.UnitLowerTriangular(eye(n)) ≈ fA
+                    @test A*UpperTriangular(eye(n)) ≈ fA
+                    @test A*LowerTriangular(eye(n)) ≈ fA
                 end
                 @testset "A_mul_B! errors" begin
                     @test_throws DimensionMismatch Base.LinAlg.A_mul_B!(zeros(fA),A,ones(elty,n,n+1))
@@ -283,14 +288,21 @@ guardsrand(123) do
                             invFsv = Fs\vv
                             x = Ts\vv
                             @test x ≈ invFsv
-                            @test Array(AbstractArray(Tldlt)) ≈ Fs
+                            @test Array(Tldlt) ≈ Fs
                         end
 
                         @testset "similar" begin
                             @test isa(similar(Ts), SymTridiagonal{elty})
                             @test isa(similar(Ts, Int), SymTridiagonal{Int})
-                            @test isa(similar(Ts, Int, (3,2)), Matrix{Int})
+                            @test isa(similar(Ts, (3, 2)), SparseMatrixCSC)
+                            @test isa(similar(Ts, Int, (3, 2)), SparseMatrixCSC{Int})
                         end
+
+                        @test first(logabsdet(Tldlt)) ≈ first(logabsdet(Fs))
+                        @test last(logabsdet(Tldlt))  ≈ last(logabsdet(Fs))
+                        # just test that the det method exists. The numerical value of the
+                        # determinant is unreliable
+                        det(Tldlt)
                     end
                 end
             else # mat_type is Tridiagonal

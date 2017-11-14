@@ -127,6 +127,8 @@ end
 end
 
 Base.@propagate_inbounds _broadcast_getindex(A, I) = _broadcast_getindex(containertype(A), A, I)
+# `(x,)`, where `x` is a scalar, broadcasts the same way as `[x]` or `x`
+Base.@propagate_inbounds _broadcast_getindex(::Type{Tuple}, A::Tuple{Any}, I) = A[1]
 Base.@propagate_inbounds _broadcast_getindex(::Type{Array}, A::Ref, I) = A[]
 Base.@propagate_inbounds _broadcast_getindex(::ScalarType, A, I) = A
 Base.@propagate_inbounds _broadcast_getindex(::Any, A, I) = A[I]
@@ -333,13 +335,32 @@ end
 end
 @inline broadcast_c(f, ::Type{Any}, a...) = f(a...)
 @inline broadcast_c(f, ::Type{Tuple}, A, Bs...) =
-    tuplebroadcast(f, first_tuple(A, Bs...), A, Bs...)
+    tuplebroadcast(f, tuplebroadcast_maxtuple(A, Bs...), A, Bs...)
 @inline tuplebroadcast(f, ::NTuple{N,Any}, As...) where {N} =
     ntuple(k -> f(tuplebroadcast_getargs(As, k)...), Val(N))
 @inline tuplebroadcast(f, ::NTuple{N,Any}, ::Type{T}, As...) where {N,T} =
     ntuple(k -> f(T, tuplebroadcast_getargs(As, k)...), Val(N))
-first_tuple(A::Tuple, Bs...) = A
-@inline first_tuple(A, Bs...) = first_tuple(Bs...)
+# When the result of broadcast is a tuple it can only come from mixing n-tuples
+# of the same length with scalars and 1-tuples. So, in order to have a
+# type-stable broadcast, we need to find a tuple of maximum length (except when
+# there are only scalars, empty tuples and 1-tuples, in which case the
+# returned value will be an empty tuple).
+# The following methods compare broadcast arguments pairwise to determine the
+# length of the final tuple.
+tuplebroadcast_maxtuple(A, B) =
+    _tuplebroadcast_maxtuple(containertype(A), containertype(B), A, B)
+@inline tuplebroadcast_maxtuple(A, Bs...) =
+    tuplebroadcast_maxtuple(A, tuplebroadcast_maxtuple(Bs...))
+tuplebroadcast_maxtuple(A::NTuple{N,Any}, ::NTuple{N,Any}...) where {N} = A
+# Here we use the containertype trait to easier disambiguate between methods
+_tuplebroadcast_maxtuple(::Type{Any}, ::Type{Any}, A, B) = (nothing,)
+_tuplebroadcast_maxtuple(::Type{Tuple}, ::Type{Any}, A, B) = A
+_tuplebroadcast_maxtuple(::Type{Any}, ::Type{Tuple}, A, B) = B
+_tuplebroadcast_maxtuple(::Type{Tuple}, ::Type{Tuple}, A, B::Tuple{Any}) = A
+_tuplebroadcast_maxtuple(::Type{Tuple}, ::Type{Tuple}, A::Tuple{Any}, B) = B
+_tuplebroadcast_maxtuple(::Type{Tuple}, ::Type{Tuple}, A::Tuple{Any}, ::Tuple{Any}) = A
+_tuplebroadcast_maxtuple(::Type{Tuple}, ::Type{Tuple}, A, B) =
+    throw(DimensionMismatch("tuples could not be broadcast to a common size"))
 tuplebroadcast_getargs(::Tuple{}, k) = ()
 @inline tuplebroadcast_getargs(As, k) =
     (_broadcast_getindex(first(As), k), tuplebroadcast_getargs(tail(As), k)...)
@@ -534,10 +555,7 @@ end
 # explicit calls to view.   (All of this can go away if slices
 # are changed to generate views by default.)
 
-Base.@propagate_inbounds dotview(args...) = getindex(args...)
-Base.@propagate_inbounds dotview(A::AbstractArray, args...) = view(A, args...)
-Base.@propagate_inbounds dotview(A::AbstractArray{<:AbstractArray}, args::Integer...) = getindex(A, args...)
-
+Base.@propagate_inbounds dotview(args...) = Base.maybeview(args...)
 
 ############################################################
 # The parser turns @. into a call to the __dot__ macro,
@@ -600,9 +618,9 @@ julia> x = 1.0:3.0; y = similar(x);
 
 julia> @. y = x + 3 * sin(x)
 3-element Array{Float64,1}:
- 3.52441
- 4.72789
- 3.42336
+ 3.5244129544236893
+ 4.727892280477045
+ 3.4233600241796016
 ```
 """
 macro __dot__(x)

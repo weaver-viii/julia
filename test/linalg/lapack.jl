@@ -104,7 +104,7 @@ end
         C = rand(elty,6,6)
         D = copy(C)
         D = LAPACK.gbtrs!('N',2,1,6,AB,ipiv,D)
-        A = diagm(dl2,-2) + diagm(dl,-1) + diagm(d) + diagm(du,1)
+        A = diagm(-2 => dl2, -1 => dl, 0 => d, 1 => du)
         @test A\C ≈ D
         @test_throws DimensionMismatch LAPACK.gbtrs!('N',2,1,6,AB,ipiv,ones(elty,7,6))
         @test_throws Base.LinAlg.LAPACKException LAPACK.gbtrf!(2,1,6,zeros(AB))
@@ -376,6 +376,14 @@ end
         b,A = LAPACK.sysv_rook!('U',A,b)
         @test b ≈ c
         @test_throws DimensionMismatch LAPACK.sysv_rook!('U',A,rand(elty,11))
+
+        # syconvf_rook error handling
+        # way argument is wrong
+        @test_throws ArgumentError LAPACK.syconvf_rook!('U', 'U', A, rand(BlasInt, 10))
+        # ipiv has wrong length
+        @test_throws ArgumentError LAPACK.syconvf_rook!('U', 'R', A, rand(BlasInt, 9))
+        # e has wrong length
+        @test_throws ArgumentError LAPACK.syconvf_rook!('U', 'R', A, rand(BlasInt, 10), rand(elty, 9))
     end
 end
 
@@ -425,32 +433,36 @@ end
 
 @testset "sysv" begin
     @testset for elty in (Float32, Float64, Complex64, Complex128)
-        A = rand(elty,10,10)
-        A = A + A.' #symmetric!
-        b = rand(elty,10)
-        c = A \ b
-        b,A = LAPACK.sysv!('U',A,b)
-        @test b ≈ c
-        @test_throws DimensionMismatch LAPACK.sysv!('U',A,rand(elty,11))
+        guardsrand(123) do
+            A = rand(elty,10,10)
+            A = A + A.' #symmetric!
+            b = rand(elty,10)
+            c = A \ b
+            b,A = LAPACK.sysv!('U',A,b)
+            @test b ≈ c
+            @test_throws DimensionMismatch LAPACK.sysv!('U',A,rand(elty,11))
+        end
     end
 end
 
 @testset "hesv" begin
     @testset for elty in (Complex64, Complex128)
-        A = rand(elty,10,10)
-        A = A + A' #hermitian!
-        b = rand(elty,10)
-        c = A \ b
-        b,A = LAPACK.hesv!('U',A,b)
-        @test b ≈ c
-        @test_throws DimensionMismatch LAPACK.hesv!('U',A,rand(elty,11))
-        A = rand(elty,10,10)
-        A = A + A' #hermitian!
-        b = rand(elty,10)
-        c = A \ b
-        b,A = LAPACK.hesv_rook!('U',A,b)
-        @test b ≈ c
-        @test_throws DimensionMismatch LAPACK.hesv_rook!('U',A,rand(elty,11))
+        guardsrand(935) do
+            A = rand(elty,10,10)
+            A = A + A' #hermitian!
+            b = rand(elty,10)
+            c = A \ b
+            b,A = LAPACK.hesv!('U',A,b)
+            @test b ≈ c
+            @test_throws DimensionMismatch LAPACK.hesv!('U',A,rand(elty,11))
+            A = rand(elty,10,10)
+            A = A + A' #hermitian!
+            b = rand(elty,10)
+            c = A \ b
+            b,A = LAPACK.hesv_rook!('U',A,b)
+            @test b ≈ c
+            @test_throws DimensionMismatch LAPACK.hesv_rook!('U',A,rand(elty,11))
+        end
     end
 end
 
@@ -499,7 +511,7 @@ end
 @testset "posv and some errors for friends" begin
     @testset for elty in (Float32, Float64, Complex64, Complex128)
         A = rand(elty,10,10)/100
-        A += real(diagm(10*real(rand(elty,10))))
+        A += real(diagm(0 => 10*real(rand(elty,10))))
         if elty <: Complex
             A = A + A'
         else

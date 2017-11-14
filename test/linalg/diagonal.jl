@@ -17,7 +17,7 @@ srand(1)
         UU+=im*convert(Matrix{elty}, randn(n,n))
     end
     D = Diagonal(dd)
-    DM = diagm(dd)
+    DM = Matrix(Diagonal(dd))
 
     @testset "constructor" begin
         for x in (dd, GenericArray(dd))
@@ -29,7 +29,6 @@ srand(1)
     end
 
     @testset "Basic properties" begin
-        @test eye(Diagonal{elty},n) == Diagonal(ones(elty,n))
         @test_throws ArgumentError size(D,0)
         @test typeof(convert(Diagonal{Complex64},D)) <: Diagonal{Complex64}
         @test typeof(convert(AbstractMatrix{Complex64},D)) <: Diagonal{Complex64}
@@ -39,7 +38,6 @@ srand(1)
         @test Array(imag(D)) == imag(DM)
 
         @test parent(D) == dd
-        @test diag(D) == dd
         @test D[1,1] == dd[1]
         @test D[1,2] == 0
 
@@ -51,6 +49,18 @@ srand(1)
         end
     end
 
+    @testset "diag" begin
+        @test_throws ArgumentError diag(D,  n+1)
+        @test_throws ArgumentError diag(D, -n-1)
+        @test (@inferred diag(D))::typeof(dd) == dd
+        @test (@inferred diag(D, 0))::typeof(dd) == dd
+        @test (@inferred diag(D, 1))::typeof(dd) == zeros(elty, n-1)
+        DG = Diagonal(GenericArray(dd))
+        @test (@inferred diag(DG))::typeof(GenericArray(dd)) == GenericArray(dd)
+        @test (@inferred diag(DG, 1))::typeof(GenericArray(dd)) == GenericArray(zeros(elty, n-1))
+    end
+
+
     @testset "Simple unary functions" begin
         for op in (-,)
             @test op(D)==op(DM)
@@ -60,13 +70,15 @@ srand(1)
             @test func(D) ≈ func(DM) atol=n^2*eps(relty)*(1+(elty<:Complex))
         end
         if relty <: BlasFloat
-            for func in (exp,)
+            for func in (exp, sinh, cosh, tanh, sech, csch, coth)
                 @test func(D) ≈ func(DM) atol=n^3*eps(relty)
             end
             @test log(Diagonal(abs.(D.diag))) ≈ log(abs.(DM)) atol=n^3*eps(relty)
         end
         if elty <: BlasComplex
-            for func in (logdet, sqrt)
+            for func in (logdet, sqrt, sin, cos, tan, sec, csc, cot,
+                         asin, acos, atan, asec, acsc, acot,
+                         asinh, acosh, atanh, asech, acsch, acoth)
                 @test func(D) ≈ func(DM) atol=n^2*eps(relty)*2
             end
         end
@@ -121,7 +133,7 @@ srand(1)
     end
     d = convert(Vector{elty}, randn(n))
     D2 = Diagonal(d)
-    DM2= diagm(d)
+    DM2= Matrix(Diagonal(d))
     @testset "Binary operations" begin
         for op in (+, -, *)
             @test Array(op(D, D2)) ≈ op(DM, DM2)
@@ -222,14 +234,14 @@ srand(1)
     #logdet
     if relty <: Real
         ld=convert(Vector{relty},rand(n))
-        @test logdet(Diagonal(ld)) ≈ logdet(diagm(ld))
+        @test logdet(Diagonal(ld)) ≈ logdet(Matrix(Diagonal(ld)))
     end
 
     @testset "similar" begin
         @test isa(similar(D), Diagonal{elty})
         @test isa(similar(D, Int), Diagonal{Int})
-        @test isa(similar(D, (3,2)), Matrix{elty})
-        @test isa(similar(D, Int, (3,2)), Matrix{Int})
+        @test isa(similar(D, (3,2)), SparseMatrixCSC{elty})
+        @test isa(similar(D, Int, (3,2)), SparseMatrixCSC{Int})
     end
 
     # Issue number 10036

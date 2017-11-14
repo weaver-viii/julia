@@ -1161,17 +1161,17 @@ of `A`. `fact` may be `E`, in which case `A` will be equilibrated and copied
 to `AF`; `F`, in which case `AF` and `ipiv` from a previous `LU` factorization
 are inputs; or `N`, in which case `A` will be copied to `AF` and then
 factored. If `fact = F`, `equed` may be `N`, meaning `A` has not been
-equilibrated; `R`, meaning `A` was multiplied by `diagm(R)` from the left;
-`C`, meaning `A` was multiplied by `diagm(C)` from the right; or `B`, meaning
-`A` was multiplied by `diagm(R)` from the left and `diagm(C)` from the right.
+equilibrated; `R`, meaning `A` was multiplied by `Diagonal(R)` from the left;
+`C`, meaning `A` was multiplied by `Diagonal(C)` from the right; or `B`, meaning
+`A` was multiplied by `Diagonal(R)` from the left and `Diagonal(C)` from the right.
 If `fact = F` and `equed = R` or `B` the elements of `R` must all be positive.
 If `fact = F` and `equed = C` or `B` the elements of `C` must all be positive.
 
 Returns the solution `X`; `equed`, which is an output if `fact` is not `N`,
 and describes the equilibration that was performed; `R`, the row equilibration
 diagonal; `C`, the column equilibration diagonal; `B`, which may be overwritten
-with its equilibrated form `diagm(R)*B` (if `trans = N` and `equed = R,B`) or
-`diagm(C)*B` (if `trans = T,C` and `equed = C,B`); `rcond`, the reciprocal
+with its equilibrated form `Diagonal(R)*B` (if `trans = N` and `equed = R,B`) or
+`Diagonal(C)*B` (if `trans = T,C` and `equed = C,B`); `rcond`, the reciprocal
 condition number of `A` after equilbrating; `ferr`, the forward error bound for
 each solution vector in `X`; `berr`, the forward error bound for each solution
 vector in `X`; and `work`, the reciprocal pivot growth factor.
@@ -4118,20 +4118,21 @@ for (sysv, sytrf, sytri, sytrs, syconvf, elty) in
         # INTEGER            IPIV( * )
         # DOUBLE PRECISION   A( LDA, * ), E( * )
         function syconvf_rook!(uplo::Char, way::Char, A::StridedMatrix{$elty},
-                               ipiv::StridedVector{BlasInt}, e::StridedVector{$elty})
+                               ipiv::StridedVector{BlasInt}, e::StridedVector{$elty} = Vector{$elty}(length(ipiv)))
             # extract
             n = checksquare(A)
+            lda = max(1, stride(A, 2))
 
             # check
             chkuplo(uplo)
-            if way != :C && way != :R
-                throw(ArgumentError("way must be :C or :R"))
+            if way != 'C' && way != 'R'
+                throw(ArgumentError("way must be C or R"))
             end
             if length(ipiv) != n
                 throw(ArgumentError("length of pivot vector was $(length(ipiv)) but should have been $n"))
             end
             if length(e) != n
-                throw(ArgumentError("length of e vector was $(length(ipiv)) but should have been $n"))
+                throw(ArgumentError("length of e vector was $(length(e)) but should have been $n"))
             end
 
             # allocate
@@ -4139,9 +4140,9 @@ for (sysv, sytrf, sytri, sytrs, syconvf, elty) in
 
             ccall((@blasfunc($syconvf), liblapack), Void,
                 (Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ptr{$elty},
-                 Ref{BlasInt}, Ptr{BlasInt}, Ptr{$elty}, Ptr{BlasInt}),
+                 Ref{BlasInt}, Ptr{$elty}, Ptr{BlasInt}, Ptr{BlasInt}),
                 uplo, way, n, A,
-                lda, ipiv, e, info)
+                lda, e, ipiv, info)
 
             chklapackerror(info[])
             return A, e
@@ -4731,7 +4732,7 @@ for (sysv, sytrf, sytri, sytrs, syconvf, elty, relty) in
                 throw(ArgumentError("length of pivot vector was $(length(ipiv)) but should have been $n"))
             end
             if length(e) != n
-                throw(ArgumentError("length of e vector was $(length(ipiv)) but should have been $n"))
+                throw(ArgumentError("length of e vector was $(length(e)) but should have been $n"))
             end
 
             # allocate
@@ -4739,9 +4740,9 @@ for (sysv, sytrf, sytri, sytrs, syconvf, elty, relty) in
 
             ccall((@blasfunc($syconvf), liblapack), Void,
                 (Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ptr{$elty},
-                 Ref{BlasInt}, Ptr{BlasInt}, Ptr{$elty}, Ptr{BlasInt}),
+                 Ref{BlasInt}, Ptr{$elty}, Ptr{BlasInt}, Ptr{BlasInt}),
                 uplo, way, n, A,
-                max(1, lda), ipiv, e, info)
+                max(1, lda), e, ipiv, info)
 
             chklapackerror(info[])
             return A, e

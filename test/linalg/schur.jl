@@ -31,7 +31,7 @@ aimg  = randn(n,n)/2
         @test sort(real(f[:values])) ≈ sort(real(d))
         @test sort(imag(f[:values])) ≈ sort(imag(d))
         @test istriu(f[:Schur]) || eltype(a)<:Real
-        @test AbstractArray(f) ≈ a
+        @test convert(Array, f) ≈ a
         @test_throws KeyError f[:A]
 
         sch, vecs, vals = schur(UpperTriangular(triu(a)))
@@ -42,6 +42,8 @@ aimg  = randn(n,n)/2
         @test vecs*sch*vecs' ≈ asym
         sch, vecs, vals = schur(Symmetric(a+a.'))
         @test vecs*sch*vecs' ≈ a + a.'
+        sch, vecs, vals = schur(Tridiagonal(a+a.'))
+        @test vecs*sch*vecs' ≈ Tridiagonal(a + a.')
 
         tstring = sprint(show,f[:T])
         zstring = sprint(show,f[:Z])

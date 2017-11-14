@@ -88,7 +88,7 @@ tag = Base.have_color ? Base.text_colors[Base.error_color()] : "ARRAY{FLOAT64,N}
 # Make sure emphasis is not used for other functions
 tag = Base.have_color ? Base.text_colors[Base.error_color()] : "ANY"
 iob = IOBuffer()
-show(iob, expand(Main, :(x -> x^2)))
+show(iob, Meta.lower(Main, :(x -> x^2)))
 str = String(take!(iob))
 @test isempty(search(str, tag))
 
@@ -328,10 +328,10 @@ tlayout = TLayout(5,7,11)
 @test [(fieldoffset(TLayout,i), fieldname(TLayout,i), fieldtype(TLayout,i)) for i = 1:fieldcount(TLayout)] ==
     [(0, :x, Int8), (2, :y, Int16), (4, :z, Int32)]
 @test_throws BoundsError fieldtype(TLayout, 0)
-@test_throws BoundsError fieldname(TLayout, 0)
+@test_throws ArgumentError fieldname(TLayout, 0)
 @test_throws BoundsError fieldoffset(TLayout, 0)
 @test_throws BoundsError fieldtype(TLayout, 4)
-@test_throws BoundsError fieldname(TLayout, 4)
+@test_throws ArgumentError fieldname(TLayout, 4)
 @test_throws BoundsError fieldoffset(TLayout, 4)
 
 @test fieldtype(Tuple{Vararg{Int8}}, 1) === Int8
@@ -342,13 +342,13 @@ tlayout = TLayout(5,7,11)
 @test_throws BoundsError fieldname(NTuple{3, Int}, 0)
 @test_throws BoundsError fieldname(NTuple{3, Int}, 4)
 
-import Base: isstructtype, type_alignment, return_types
+import Base: isstructtype, datatype_alignment, return_types
 @test !isstructtype(Union{})
 @test !isstructtype(Union{Int,Float64})
 @test !isstructtype(Int)
 @test isstructtype(TLayout)
-@test type_alignment(UInt16) == 2
-@test type_alignment(TLayout) == 4
+@test datatype_alignment(UInt16) == 2
+@test datatype_alignment(TLayout) == 4
 let rts = return_types(TLayout)
     @test length(rts) >= 3 # general constructor, specific constructor, and call-to-convert adapter(s)
     @test all(rts .== TLayout)
@@ -565,7 +565,7 @@ function f15280(x) end
 
 # bug found in #16850, Base.url with backslashes on Windows
 function module_depth(from::Module, to::Module)
-    if from === to
+    if from === to || module_parent(to) === to
         return 0
     else
         return 1 + module_depth(from, module_parent(to))
@@ -761,7 +761,7 @@ world = typemax(UInt)
 mtypes, msp, m = Base._methods_by_ftype(T22979, -1, world)[]
 instance = Core.Inference.code_for_method(m, mtypes, msp, world, false)
 cinfo_generated = Core.Inference.get_staged(instance)
-cinfo_ungenerated = Base.uncompressed_ast(m)
+@test_throws ErrorException Base.uncompressed_ast(m)
 
 test_similar_codeinfo(@code_lowered(f22979(x22979...)), cinfo_generated)
 
@@ -770,7 +770,4 @@ cinfos = code_lowered(f22979, typeof.(x22979), true)
 cinfo = cinfos[]
 test_similar_codeinfo(cinfo, cinfo_generated)
 
-cinfos = code_lowered(f22979, typeof.(x22979), false)
-@test length(cinfos) == 1
-cinfo = cinfos[]
-test_similar_codeinfo(cinfo, cinfo_ungenerated)
+@test_throws ErrorException code_lowered(f22979, typeof.(x22979), false)

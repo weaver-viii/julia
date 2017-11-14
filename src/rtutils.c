@@ -241,9 +241,12 @@ JL_DLLEXPORT jl_value_t *jl_apply_with_saved_exception_state(jl_value_t **args, 
     jl_ptls_t ptls = jl_get_ptls_states();
     jl_value_t *exc = ptls->exception_in_transit;
     jl_array_t *bt = NULL;
-    JL_GC_PUSH2(&exc, &bt);
-    if (ptls->bt_size > 0)
-        bt = (jl_array_t*)jl_get_backtrace();
+    jl_array_t *bt2 = NULL;
+    JL_GC_PUSH3(&exc, &bt, &bt2);
+    if (ptls->bt_size > 0) {
+        jl_get_backtrace(&bt, &bt2);
+        ptls->bt_size = 0;
+    }
     jl_value_t *v;
     JL_TRY {
         v = jl_apply(args, nargs);
@@ -259,8 +262,9 @@ JL_DLLEXPORT jl_value_t *jl_apply_with_saved_exception_state(jl_value_t **args, 
     }
     ptls->exception_in_transit = exc;
     if (bt != NULL) {
+        // This is sufficient because bt2 roots the gc-managed values
+        memcpy(ptls->bt_data, bt->data, jl_array_len(bt) * sizeof(void*));
         ptls->bt_size = jl_array_len(bt);
-        memcpy(ptls->bt_data, bt->data, ptls->bt_size * sizeof(void*));
     }
     JL_GC_POP();
     return v;
@@ -538,14 +542,12 @@ static size_t jl_static_show_x_(JL_STREAM *out, jl_value_t *v, jl_datatype_t *vt
     else if (vt == jl_method_instance_type) {
         jl_method_instance_t *li = (jl_method_instance_t*)v;
         if (jl_is_method(li->def.method)) {
-            jl_method_t *m = li->def.method;
-            n += jl_static_show_x(out, (jl_value_t*)m->module, depth);
             if (li->specTypes) {
-                n += jl_printf(out, ".");
-                n += jl_show_svec(out, ((jl_datatype_t*)jl_unwrap_unionall(li->specTypes))->parameters,
-                                  jl_symbol_name(m->name), "(", ")");
+                n += jl_static_show_func_sig(out, li->specTypes);
             }
             else {
+                jl_method_t *m = li->def.method;
+                n += jl_static_show_x(out, (jl_value_t*)m->module, depth);
                 n += jl_printf(out, ".%s(?)", jl_symbol_name(m->name));
             }
         }
@@ -864,8 +866,8 @@ static size_t jl_static_show_x_(JL_STREAM *out, jl_value_t *v, jl_datatype_t *vt
         n += jl_printf(out, ")");
     }
     else if (jl_is_datatype(vt)) {
-        int istuple = jl_is_tuple_type(vt);
-        if (!istuple)
+        int istuple = jl_is_tuple_type(vt), isnamedtuple = jl_is_namedtuple_type(vt);
+        if (!istuple && !isnamedtuple)
             n += jl_static_show_x(out, (jl_value_t*)vt, depth);
         n += jl_printf(out, "(");
         size_t nb = jl_datatype_size(vt);
@@ -898,7 +900,7 @@ static size_t jl_static_show_x_(JL_STREAM *out, jl_value_t *v, jl_datatype_t *vt
                     }
                     n += jl_static_show_x_(out, (jl_value_t*)fld_ptr, ft, depth);
                 }
-                if (istuple && tlen == 1)
+                if ((istuple || isnamedtuple) && tlen == 1)
                     n += jl_printf(out, ",");
                 else if (i != tlen - 1)
                     n += jl_printf(out, ", ");
@@ -949,7 +951,7 @@ JL_DLLEXPORT size_t jl_static_show_func_sig(JL_STREAM *s, jl_value_t *type)
     if (ftype == NULL)
         return jl_static_show(s, type);
     size_t n = 0;
-    if (jl_nparams(ftype)==0 || ftype == ((jl_datatype_t*)ftype)->name->wrapper) {
+    if (jl_nparams(ftype) == 0 || ftype == ((jl_datatype_t*)ftype)->name->wrapper) {
         n += jl_printf(s, "%s", jl_symbol_name(((jl_datatype_t*)ftype)->name->mt->name));
     }
     else {
@@ -957,7 +959,7 @@ JL_DLLEXPORT size_t jl_static_show_func_sig(JL_STREAM *s, jl_value_t *type)
         n += jl_static_show(s, ftype);
         n += jl_printf(s, ")");
     }
-    // TODO: better way to show method parameters
+    jl_unionall_t *tvars = (jl_unionall_t*)type;
     type = jl_unwrap_unionall(type);
     if (!jl_is_datatype(type)) {
         n += jl_printf(s, " ");
@@ -984,6 +986,19 @@ JL_DLLEXPORT size_t jl_static_show_func_sig(JL_STREAM *s, jl_value_t *type)
         }
     }
     n += jl_printf(s, ")");
+    if (jl_is_unionall(tvars)) {
+        int first = 1;
+        n += jl_printf(s, " where {");
+        while (jl_is_unionall(tvars)) {
+            if (first)
+                first = 0;
+            else
+                n += jl_printf(s, ", ");
+            n += jl_static_show(s, (jl_value_t*)tvars->var);
+            tvars = (jl_unionall_t*)tvars->body;
+        }
+        n += jl_printf(s, "}");
+    }
     return n;
 }
 

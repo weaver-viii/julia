@@ -195,6 +195,10 @@ timesofar("utils")
     a = trues(3)
     @test BitArray(a) !== a
     @test BitArray{1}(a) !== a
+
+    # issue #24062
+    @test_throws InexactError BitArray([0, 1, 2, 3])
+    @test_throws MethodError BitArray([0, ""])
 end
 
 timesofar("constructors")
@@ -202,9 +206,16 @@ timesofar("constructors")
 @testset "Indexing" begin
     @testset "0d for size $sz" for (sz,T) in allsizes
         b1 = rand!(falses(sz...))
-        @check_bit_operation getindex(b1)         Bool
-        @check_bit_operation setindex!(b1, true)  T
-        @check_bit_operation setindex!(b1, false) T
+        if length(b1) == 1
+            @check_bit_operation getindex(b1)         Bool
+            @check_bit_operation setindex!(b1, true)  T
+            @check_bit_operation setindex!(b1, false) T
+        else
+            # TODO: Re-enable after PLI deprecation is removed
+            # @test_throws getindex(b1)
+            # @test_throws setindex!(b1, true)
+            # @test_throws setindex!(b1, false)
+        end
     end
 
     @testset "linear for size $sz" for (sz,T) in allsizes[2:end]
@@ -1402,7 +1413,11 @@ timesofar("cat")
     @check_bit_operation qr(b1)
 
     b1 = bitrand(v1)
-    @check_bit_operation diagm(b1) BitMatrix
+    @check_bit_operation diagm(0 => b1) BitMatrix
+
+    b1 = bitrand(v1)
+    b2 = bitrand(v1)
+    @check_bit_operation diagm(-1 => b1, 1 => b2) BitMatrix
 
     b1 = bitrand(n1, n1)
     @check_bit_operation diag(b1)

@@ -1816,7 +1816,7 @@ end
     @test isa(0b00000000000000000000000000000000000000000000000000000000000000000,UInt128)
     @test isa(0b00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000,UInt128)
     # remove BigInt unsigned integer literals #11105
-    @test_throws ParseError parse("0b000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
+    @test_throws Meta.ParseError Meta.parse("0b000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
     @test isa(0b11111111,UInt8)
     @test isa(0b111111111,UInt16)
     @test isa(0b1111111111111111,UInt16)
@@ -1827,7 +1827,7 @@ end
     @test isa(0b11111111111111111111111111111111111111111111111111111111111111111,UInt128)
     @test isa(0b11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111,UInt128)
     # remove BigInt unsigned integer literals #11105
-    @test_throws ParseError parse("0b111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111")
+    @test_throws Meta.ParseError Meta.parse("0b111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111")
 end
 @testset "octal literals" begin
     @test 0o10 == 0x8
@@ -1845,7 +1845,7 @@ end
     @test isa(0o0000000000000000000000,UInt128)
     @test isa(0o000000000000000000000000000000000000000000,UInt128)
     # remove BigInt unsigned integer literals #11105
-    @test_throws ParseError parse("0o0000000000000000000000000000000000000000000")
+    @test_throws Meta.ParseError Meta.parse("0o0000000000000000000000000000000000000000000")
     @test isa(0o11,UInt8)
     @test isa(0o111,UInt8)
     @test isa(0o11111,UInt16)
@@ -1857,7 +1857,7 @@ end
     @test isa(0o111111111111111111111111111111111111111111,UInt128)
     @test isa(0o1111111111111111111111111111111111111111111,UInt128)
     # remove BigInt unsigned integer literals #11105
-    @test_throws ParseError parse("0o11111111111111111111111111111111111111111111")
+    @test_throws Meta.ParseError Meta.parse("0o11111111111111111111111111111111111111111111")
 end
 @testset "hexadecimal literals" begin
     @test isa(0x00,UInt8)
@@ -1870,7 +1870,7 @@ end
     @test isa(0x00000000000000000,UInt128)
     @test isa(0x00000000000000000000000000000000,UInt128)
     # remove BigInt unsigned integer literals #11105
-    @test_throws ParseError parse("0x000000000000000000000000000000000")
+    @test_throws Meta.ParseError Meta.parse("0x000000000000000000000000000000000")
 
     @test isa(0x11,UInt8)
     @test isa(0x111,UInt16)
@@ -1882,7 +1882,7 @@ end
     @test isa(0x11111111111111111,UInt128)
     @test isa(0x11111111111111111111111111111111,UInt128)
     # remove BigInt unsigned integer literals #11105
-    @test_throws ParseError parse("0x111111111111111111111111111111111")
+    @test_throws Meta.ParseError Meta.parse("0x111111111111111111111111111111111")
 end
 @testset "minus sign and unsigned literals" begin
     # "-" is not part of unsigned literals
@@ -1902,7 +1902,7 @@ end
     @test isa(-0x00000000000000000,UInt128)
     @test isa(-0x00000000000000000000000000000000,UInt128)
     # remove BigInt unsigned integer literals #11105
-    @test_throws ParseError parse("-0x000000000000000000000000000000000")
+    @test_throws Meta.ParseError Meta.parse("-0x000000000000000000000000000000000")
 end
 @testset "Float32 literals" begin
     @test isa(1f0,Float32)
@@ -2369,8 +2369,8 @@ end
 @test -0.0 + false === -0.0
 
 @testset "issue #5881" begin
-    @test bits(true) == "00000001"
-    @test bits(false) == "00000000"
+    @test bitstring(true) == "00000001"
+    @test bitstring(false) == "00000000"
 end
 @testset "edge cases of intrinsics" begin
     let g() = sqrt(-1.0)
@@ -2944,16 +2944,19 @@ Base.literal_pow(::typeof(^), ::PR20530, ::Val{p}) where {p} = 2
     @test [x,x,x].^2 == [2,2,2]
     for T in (Float16, Float32, Float64, BigFloat, Int8, Int, BigInt, Complex{Int}, Complex{Float64})
         for p in -4:4
-            if p < 0 && real(T) <: Integer
-                @test_throws DomainError eval(:($T(2)^$p))
-            else
-                v = eval(:($T(2)^$p))
-                @test 2.0^p == T(2)^p == v
+            v = eval(:($T(2)^$p))
+            @test 2.0^p == v
+            if p >= 0 || T == float(T)
+                @test v == T(2)^p
                 @test v isa T
+            else
+                @test v isa float(T)
             end
         end
     end
     @test PR20889(2)^3 == 5
+    @test [2,4,8].^-2 == [0.25, 0.0625, 0.015625]
+    @test ℯ^-2 == exp(-2) ≈ inv(ℯ^2) ≈ (ℯ^-1)^2 ≈ sqrt(ℯ^-4)
 end
 module M20889 # do we get the expected behavior without importing Base.^?
     using Test

@@ -345,7 +345,7 @@ must be convertible to `Int`:
 julia> Foo((), 23.5, 1)
 ERROR: InexactError: convert(Int64, 23.5)
 Stacktrace:
- [1] convert at ./float.jl:701 [inlined]
+ [1] convert at ./float.jl:703 [inlined]
  [2] Foo(::Tuple{}, ::Float64, ::Int64) at ./none:2
 ```
 
@@ -651,7 +651,7 @@ ERROR: MethodError: Cannot `convert` an object of type Float64 to an object of t
 This may have arisen from a call to the constructor Point{Float64}(...),
 since type constructors fall back to convert methods.
 Stacktrace:
- [1] Point{Float64}(::Float64) at ./sysimg.jl:103
+ [1] Point{Float64}(::Float64) at ./sysimg.jl:114
 
 julia> Point{Float64}(1.0,2.0,3.0)
 ERROR: MethodError: no method matching Point{Float64}(::Float64, ::Float64, ::Float64)
@@ -904,6 +904,31 @@ used to represent the arguments accepted by varargs methods (see [Varargs Functi
 
 The type `Vararg{T,N}` corresponds to exactly `N` elements of type `T`.  `NTuple{N,T}` is a convenient
 alias for `Tuple{Vararg{T,N}}`, i.e. a tuple type containing exactly `N` elements of type `T`.
+
+### Named Tuple Types
+
+Named tuples are instances of the `NamedTuple` type, which has two parameters: a tuple of
+symbols giving the field names, and a tuple type giving the field types.
+
+```jldoctest
+julia> typeof((a=1,b="hello"))
+NamedTuple{(:a, :b),Tuple{Int64,String}}
+```
+
+A `NamedTuple` type can be used as a constructor, accepting a single tuple argument.
+The constructed `NamedTuple` type can be either a concrete type, with both parameters specified,
+or a type that specifies only field names:
+
+```jldoctest
+julia> NamedTuple{(:a, :b),Tuple{Float32, String}}((1,""))
+(a = 1.0f0, b = "")
+
+julia> NamedTuple{(:a, :b)}((1,""))
+(a = 1, b = "")
+```
+
+If field types are specified, the arguments are converted. Otherwise the types of the arguments
+are used directly.
 
 #### [Singleton Types](@id man-singleton-types)
 

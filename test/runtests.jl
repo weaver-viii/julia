@@ -91,11 +91,13 @@ cd(dirname(@__FILE__)) do
                         print_with_color(:white, rpad(rss_str,rss_align," "), "\n")
                     end
                 end
+                if p != 1
+                    # Free up memory =)
+                    rmprocs(p, waitfor=30)
+                end
             end
         end
     end
-    # Free up memory =)
-    n > 1 && rmprocs(workers(), waitfor=30)
     for t in node1_tests
         # As above, try to run each test
         # which must run on node 1. If
@@ -173,7 +175,7 @@ cd(dirname(@__FILE__)) do
             # the test runner itself had some problem, so we may have hit a segfault,
             # deserialization errors or something similar.  Record this testset as Errored.
             fake = Test.DefaultTestSet(res[1])
-            Test.record(fake, Test.Error(:test_error, res[1], res[2][1], []))
+            Test.record(fake, Test.Error(:test_error, res[1], res[2][1], [], LineNumberNode(1)))
             Test.push_testset(fake)
             Test.record(o_ts, fake)
             Test.pop_testset()

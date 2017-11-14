@@ -80,52 +80,28 @@ else
     end
 end
 
-function load_hook(prefix::String, name::String, ::Void)
-    name_jl = "$name.jl"
-    path = joinpath(prefix, name_jl)
-    isfile_casesensitive(path) && return abspath(path)
-    path = joinpath(prefix, name_jl, "src", name_jl)
-    isfile_casesensitive(path) && return abspath(path)
-    path = joinpath(prefix, name, "src", name_jl)
-    isfile_casesensitive(path) && return abspath(path)
+macro return_if_file(path)
+    quote
+        path = $(esc(path))
+        isfile_casesensitive(path) && return path
+    end
+end
+
+function find_package(name::String)
+    endswith(name, ".jl") && (name = chop(name, 0, 3))
+    for dir in [Pkg.dir(); LOAD_PATH]
+        dir = abspath(dir)
+        @return_if_file joinpath(dir, "$name.jl")
+        @return_if_file joinpath(dir, "$name.jl", "src", "$name.jl")
+        @return_if_file joinpath(dir,   name,     "src", "$name.jl")
+    end
     return nothing
 end
-load_hook(prefix::String, name::String, path::String) = path
-load_hook(prefix, name::String, ::Any) =
-    throw(ArgumentError("unrecognized custom loader in LOAD_PATH: $prefix"))
 
-_str(x::AbstractString) = String(x)
-_str(x) = x
-
-# `wd` is a working directory to search. defaults to current working directory.
-# if `wd === nothing`, no extra path is searched.
-function find_in_path(name::String, wd::Union{Void,String})
-    isabspath(name) && return name
-    base = name
-    if endswith(name,".jl")
-        base = name[1:prevind(name, end-2)]
-    else
-        name = string(base,".jl")
-    end
-    if wd !== nothing
-        isfile_casesensitive(joinpath(wd,name)) && return joinpath(wd,name)
-    end
-    path = nothing
-    path = _str(load_hook(_str(Pkg.dir()), base, path))
-    for dir in LOAD_PATH
-        path = _str(load_hook(_str(dir), base, path))
-    end
-    return path
-end
-find_in_path(name::AbstractString, wd::AbstractString = pwd()) =
-    find_in_path(String(name), String(wd))
-
-function find_source_file(file::String)
-    (isabspath(file) || isfile(file)) && return file
-    file2 = find_in_path(file)
-    file2 !== nothing && return file2
-    file2 = joinpath(JULIA_HOME, DATAROOTDIR, "julia", "base", file)
-    return isfile(file2) ? file2 : nothing
+function find_source_file(path::String)
+    (isabspath(path) || isfile(path)) && return path
+    base_path = joinpath(JULIA_HOME, DATAROOTDIR, "julia", "base", path)
+    return isfile(base_path) ? base_path : nothing
 end
 
 function find_all_in_cache_path(mod::Symbol)
@@ -218,7 +194,7 @@ function _include_dependency(modstring::AbstractString, _path::AbstractString)
         path = joinpath(dirname(prev), _path)
     end
     if _track_dependencies[]
-        push!(_require_dependencies, (modstring, path, mtime(path)))
+        push!(_require_dependencies, (modstring, normpath(path), mtime(path)))
     end
     return path, prev
 end
@@ -416,7 +392,7 @@ function _require(mod::Symbol)
         toplevel_load[] = false
         # perform the search operation to select the module file require intends to load
         name = string(mod)
-        path = find_in_path(name, nothing)
+        path = find_package(name)
         if path === nothing
             throw(ArgumentError("Module $name not found in current path.\nRun `Pkg.add(\"$name\")` to install the $name package."))
         end
@@ -628,7 +604,7 @@ for important notes.
 """
 function compilecache(name::String)
     # decide where to get the source file from
-    path = find_in_path(name, nothing)
+    path = find_package(name)
     path === nothing && throw(ArgumentError("$name not found in path"))
     path = String(path)
     # decide where to put the resulting cache file
@@ -655,7 +631,7 @@ function compilecache(name::String)
     if success(create_expr_cache(path, cachefile, concrete_deps))
         # append checksum to the end of the .ji file:
         open(cachefile, "a+") do f
-            write(f, hton(crc32c(seekstart(f))))
+            write(f, hton(_crc32c(seekstart(f))))
         end
     else
         error("Failed to precompile $name to $cachefile.")
@@ -733,6 +709,10 @@ function read_dependency_src(io::IO, filename::AbstractString)
     modules, files, required_modules, srctextpos = parse_cache_header(io)
     srctextpos == 0 && error("no source-text stored in cache file")
     seek(io, srctextpos)
+    _read_dependency_src(io, filename)
+end
+
+function _read_dependency_src(io::IO, filename::AbstractString)
     while !eof(io)
         filenamelen = ntoh(read(io, Int32))
         filenamelen == 0 && break
@@ -774,8 +754,9 @@ function stale_cachefile(modpath::String, cachefile::String)
                 continue
             end
             name = string(mod)
-            path = find_in_path(name, nothing)
+            path = find_package(name)
             if path === nothing
+                DEBUG_LOADING[] && info("JL_DEBUG_LOADING: Rejecting cache file $cachefile because dependency $name not found.")
                 return true # Won't be able to fullfill dependency
             end
         end
@@ -810,7 +791,7 @@ function stale_cachefile(modpath::String, cachefile::String)
         end
 
         # finally, verify that the cache file has a valid checksum
-        crc = crc32c(seekstart(io), filesize(io)-4)
+        crc = _crc32c(seekstart(io), filesize(io)-4)
         if crc != ntoh(read(io, UInt32))
             DEBUG_LOADING[] && info("JL_DEBUG_LOADING: Rejecting cache file $cachefile because it has an invalid checksum.")
             return true

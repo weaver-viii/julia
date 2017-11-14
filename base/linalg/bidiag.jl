@@ -147,7 +147,6 @@ function convert(::Type{Matrix{T}}, A::Bidiagonal) where T
 end
 convert(::Type{Matrix}, A::Bidiagonal{T}) where {T} = convert(Matrix{T}, A)
 convert(::Type{Array}, A::Bidiagonal) = convert(Matrix, A)
-full(A::Bidiagonal) = convert(Array, A)
 promote_rule(::Type{Matrix{T}}, ::Type{<:Bidiagonal{S}}) where {T,S} = Matrix{promote_type(T,S)}
 
 #Converting from Bidiagonal to Tridiagonal
@@ -170,7 +169,12 @@ convert(::Type{AbstractMatrix{T}}, A::Bidiagonal) where {T} = convert(Bidiagonal
 
 broadcast(::typeof(big), B::Bidiagonal) = Bidiagonal(big.(B.dv), big.(B.ev), B.uplo)
 
-similar(B::Bidiagonal, ::Type{T}) where {T} = Bidiagonal{T}(similar(B.dv, T), similar(B.ev, T), B.uplo)
+# For B<:Bidiagonal, similar(B[, neweltype]) should yield a Bidiagonal matrix.
+# On the other hand, similar(B, [neweltype,] shape...) should yield a sparse matrix.
+# The first method below effects the former, and the second the latter.
+similar(B::Bidiagonal, ::Type{T}) where {T} = Bidiagonal(similar(B.dv, T), similar(B.ev, T), B.uplo)
+similar(B::Bidiagonal, ::Type{T}, dims::Union{Dims{1},Dims{2}}) where {T} = spzeros(T, dims...)
+
 
 ###################
 # LAPACK routines #
@@ -178,11 +182,27 @@ similar(B::Bidiagonal, ::Type{T}) where {T} = Bidiagonal{T}(similar(B.dv, T), si
 
 #Singular values
 svdvals!(M::Bidiagonal{<:BlasReal}) = LAPACK.bdsdc!(M.uplo, 'N', M.dv, M.ev)[1]
-function svdfact!(M::Bidiagonal{<:BlasReal}; thin::Bool=true)
+function svdfact!(M::Bidiagonal{<:BlasReal}; full::Bool = false, thin::Union{Bool,Void} = nothing)
+    # DEPRECATION TODO: remove deprecated thin argument and associated logic after 0.7
+    if thin != nothing
+        Base.depwarn(string("the `thin` keyword argument in `svdfact!(A; thin = $(thin))` has ",
+            "been deprecated in favor of `full`, which has the opposite meaning, ",
+            "e.g. `svdfact!(A; full = $(!thin))`."), :svdfact!)
+        full::Bool = !thin
+    end
     d, e, U, Vt, Q, iQ = LAPACK.bdsdc!(M.uplo, 'I', M.dv, M.ev)
     SVD(U, d, Vt)
 end
-svdfact(M::Bidiagonal; thin::Bool=true) = svdfact!(copy(M),thin=thin)
+function svdfact(M::Bidiagonal; full::Bool = false, thin::Union{Bool,Void} = nothing)
+    # DEPRECATION TODO: remove deprecated thin argument and associated logic after 0.7
+    if thin != nothing
+        Base.depwarn(string("the `thin` keyword argument in `svdfact(A; thin = $(thin))` has ",
+            "been deprecated in favor of `full`, which has the opposite meaning, ",
+            "e.g. `svdfact(A; full = $(!thin))`."), :svdfact)
+        full::Bool = !thin
+    end
+    return svdfact!(copy(M), full = full)
+end
 
 ####################
 # Generic routines #
@@ -266,15 +286,15 @@ function triu!(M::Bidiagonal, k::Integer=0)
     return M
 end
 
-function diag(M::Bidiagonal{T}, n::Integer=0) where T
+function diag(M::Bidiagonal, n::Integer=0)
+    # every branch call similar(..., ::Int) to make sure the
+    # same vector type is returned independent of n
     if n == 0
-        return M.dv
-    elseif n == 1
-        return M.uplo == 'U' ? M.ev : zeros(T, size(M,1)-1)
-    elseif n == -1
-        return M.uplo == 'L' ? M.ev : zeros(T, size(M,1)-1)
+        return copy!(similar(M.dv, length(M.dv)), M.dv)
+    elseif (n == 1 && M.uplo == 'U') ||  (n == -1 && M.uplo == 'L')
+        return copy!(similar(M.ev, length(M.ev)), M.ev)
     elseif -size(M,1) <= n <= size(M,1)
-        return zeros(T, size(M,1)-abs(n))
+        return fill!(similar(M.dv, size(M,1)-abs(n)), 0)
     else
         throw(ArgumentError(string("requested diagonal, $n, must be at least $(-size(M, 1)) ",
             "and at most $(size(M, 2)) for an $(size(M, 1))-by-$(size(M, 2)) matrix")))
@@ -338,17 +358,31 @@ function check_A_mul_B!_sizes(C, A, B)
     end
 end
 
+# function to get the internally stored vectors for Bidiagonal and [Sym]Tridiagonal
+# to avoid allocations in A_mul_B_td! below (#24324, #24578)
+_diag(A::Tridiagonal, k) = k == -1 ? A.dl : k == 0 ? A.d : A.du
+_diag(A::SymTridiagonal, k) = k == 0 ? A.dv : A.ev
+function _diag(A::Bidiagonal, k)
+    if k == 0
+        return A.dv
+    elseif (A.uplo == 'L' && k == -1) || (A.uplo == 'U' && k == 1)
+        return A.ev
+    else
+        return diag(A, k)
+    end
+end
+
 function A_mul_B_td!(C::AbstractMatrix, A::BiTriSym, B::BiTriSym)
     check_A_mul_B!_sizes(C, A, B)
     n = size(A,1)
     n <= 3 && return A_mul_B!(C, Array(A), Array(B))
     fill!(C, zero(eltype(C)))
-    Al = diag(A, -1)
-    Ad = diag(A, 0)
-    Au = diag(A, 1)
-    Bl = diag(B, -1)
-    Bd = diag(B, 0)
-    Bu = diag(B, 1)
+    Al = _diag(A, -1)
+    Ad = _diag(A, 0)
+    Au = _diag(A, 1)
+    Bl = _diag(B, -1)
+    Bd = _diag(B, 0)
+    Bu = _diag(B, 1)
     @inbounds begin
         # first row of C
         C[1,1] = A[1,1]*B[1,1] + A[1, 2]*B[2, 1]
@@ -401,9 +435,9 @@ function A_mul_B_td!(C::AbstractVecOrMat, A::BiTriSym, B::AbstractVecOrMat)
         throw(DimensionMismatch("A has second dimension $nA, B has $(size(B,2)), C has $(size(C,2)) but all must match"))
     end
     nA <= 3 && return A_mul_B!(C, Array(A), Array(B))
-    l = diag(A, -1)
-    d = diag(A, 0)
-    u = diag(A, 1)
+    l = _diag(A, -1)
+    d = _diag(A, 0)
+    u = _diag(A, 1)
     @inbounds begin
         for j = 1:nB
             b₀, b₊ = B[1, j], B[2, j]
@@ -423,9 +457,9 @@ function A_mul_B_td!(C::AbstractMatrix, A::AbstractMatrix, B::BiTriSym)
     n = size(A,1)
     n <= 3 && return A_mul_B!(C, Array(A), Array(B))
     m = size(B,2)
-    Bl = diag(B, -1)
-    Bd = diag(B, 0)
-    Bu = diag(B, 1)
+    Bl = _diag(B, -1)
+    Bd = _diag(B, 0)
+    Bu = _diag(B, 1)
     @inbounds begin
         # first and last column of C
         B11 = Bd[1]
@@ -573,17 +607,19 @@ _valuefields(::Type{<:AbstractTriangular}) = [:data]
 
 const SpecialArrays = Union{Diagonal,Bidiagonal,Tridiagonal,SymTridiagonal,AbstractTriangular}
 
-@generated function fillslots!(A::SpecialArrays, x)
-    ex = :(xT = convert(eltype(A), x))
-    for field in _valuefields(A)
-        ex = :($ex; fill!(A.$field, xT))
+function fillslots!(A::SpecialArrays, x)
+    xT = convert(eltype(A), x)
+    if @generated
+        quote
+            $([ :(fill!(A.$field, xT)) for field in _valuefields(A) ]...)
+        end
+    else
+        for field in _valuefields(A)
+            fill!(getfield(A, field), xT)
+        end
     end
-    :($ex;return A)
+    return A
 end
-
-# for historical reasons:
-fill!(a::AbstractTriangular, x) = fillslots!(a, x)
-fill!(D::Diagonal, x) = fillslots!(D, x)
 
 _small_enough(A::Bidiagonal) = size(A, 1) <= 1
 _small_enough(A::Tridiagonal) = size(A, 1) <= 2

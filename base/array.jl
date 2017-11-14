@@ -620,7 +620,7 @@ function _collect(cont, itr, ::HasEltype, isz::SizeUnknown)
     return a
 end
 
-_collect_indices(::Tuple{}, A) = copy!(Vector{eltype(A)}(), A)
+_collect_indices(::Tuple{}, A) = copy!(Array{eltype(A)}(), A)
 _collect_indices(indsA::Tuple{Vararg{OneTo}}, A) =
     copy!(Array{eltype(A)}(length.(indsA)), A)
 function _collect_indices(indsA, A)
@@ -628,18 +628,28 @@ function _collect_indices(indsA, A)
     copy!(B, CartesianRange(indices(B)), A, CartesianRange(indsA))
 end
 
+# define this as a macro so that the call to Inference
+# gets inlined into the caller before recursion detection
+# gets a chance to see it, so that recursive calls to the caller
+# don't trigger the inference limiter
 if isdefined(Core, :Inference)
-    _default_eltype(@nospecialize itrt) = Core.Inference.return_type(first, Tuple{itrt})
+    macro default_eltype(itrt)
+        return quote
+            Core.Inference.return_type(first, Tuple{$(esc(itrt))})
+        end
+    end
 else
-    _default_eltype(@nospecialize itr) = Any
+    macro default_eltype(itrt)
+        return :(Any)
+    end
 end
 
 _array_for(::Type{T}, itr, ::HasLength) where {T} = Array{T,1}(Int(length(itr)::Integer))
-_array_for(::Type{T}, itr, ::HasShape) where {T} = similar(Array{T}, indices(itr))
+_array_for(::Type{T}, itr, ::HasShape) where {T} = similar(Array{T}, indices(itr))::Array{T}
 
 function collect(itr::Generator)
     isz = iteratorsize(itr.iter)
-    et = _default_eltype(typeof(itr))
+    et = @default_eltype(typeof(itr))
     if isa(isz, SizeUnknown)
         return grow_to!(Array{et,1}(0), itr)
     else
@@ -653,12 +663,12 @@ function collect(itr::Generator)
 end
 
 _collect(c, itr, ::EltypeUnknown, isz::SizeUnknown) =
-    grow_to!(_similar_for(c, _default_eltype(typeof(itr)), itr, isz), itr)
+    grow_to!(_similar_for(c, @default_eltype(typeof(itr)), itr, isz), itr)
 
 function _collect(c, itr, ::EltypeUnknown, isz::Union{HasLength,HasShape})
     st = start(itr)
     if done(itr,st)
-        return _similar_for(c, _default_eltype(typeof(itr)), itr, isz)
+        return _similar_for(c, @default_eltype(typeof(itr)), itr, isz)
     end
     v1, st = next(itr, st)
     collect_to_with_first!(_similar_for(c, typeof(v1), itr, isz), v1, itr, st)
@@ -746,7 +756,7 @@ function getindex end
 
 # This is more complicated than it needs to be in order to get Win64 through bootstrap
 @eval getindex(A::Array, i1::Int) = arrayref($(Expr(:boundscheck)), A, i1)
-@eval getindex(A::Array, i1::Int, i2::Int, I::Int...) = (@_inline_meta; arrayref($(Expr(:boundscheck)), A, i1, i2, I...)) # TODO: REMOVE FOR #14770
+@eval getindex(A::Array, i1::Int, i2::Int, I::Int...) = (@_inline_meta; arrayref($(Expr(:boundscheck)), A, i1, i2, I...))
 
 # Faster contiguous indexing using copy! for UnitRange and Colon
 function getindex(A::Array, I::UnitRange{Int})
@@ -785,7 +795,7 @@ function setindex! end
 
 @eval setindex!(A::Array{T}, x, i1::Int) where {T} = arrayset($(Expr(:boundscheck)), A, convert(T,x)::T, i1)
 @eval setindex!(A::Array{T}, x, i1::Int, i2::Int, I::Int...) where {T} =
-    (@_inline_meta; arrayset($(Expr(:boundscheck)), A, convert(T,x)::T, i1, i2, I...)) # TODO: REMOVE FOR #14770
+    (@_inline_meta; arrayset($(Expr(:boundscheck)), A, convert(T,x)::T, i1, i2, I...))
 
 # These are redundant with the abstract fallbacks but needed for bootstrap
 function setindex!(A::Array, x, I::AbstractVector{Int})
@@ -1440,7 +1450,8 @@ end
 """
     reverse(v [, start=1 [, stop=length(v) ]] )
 
-Return a copy of `v` reversed from start to stop.
+Return a copy of `v` reversed from start to stop.  See also [`Iterators.reverse`](@ref)
+for reverse-order iteration without making a copy.
 
 # Examples
 ```jldoctest
@@ -1586,10 +1597,10 @@ julia> A = [false false; true false]
  false  false
   true  false
 
-julia> findnext(A,1)
+julia> findnext(A, 1)
 2
 
-julia> findnext(A,3)
+julia> findnext(A, 3)
 0
 ```
 """
@@ -1600,7 +1611,7 @@ function findnext(A, start::Integer)
     while i <= l
         a = A[i]
         if !warned && !(a isa Bool)
-            depwarn("In the future `findnext` will only work on boolean collections. Use `findnext(x->x!=0, A)` instead.", :findnext)
+            depwarn("In the future `findnext` will only work on boolean collections. Use `findnext(x->x!=0, A, start)` instead.", :findnext)
             warned = true
         end
         if a != 0
@@ -1620,15 +1631,15 @@ To search for other kinds of values, pass a predicate as the first argument.
 
 # Examples
 ```jldoctest
-julia> A = [0 0; 1 0]
-2×2 Array{Int64,2}:
- 0  0
- 1  0
+julia> A = [false false; true false]
+2×2 Array{Bool,2}:
+ false  false
+  true  false
 
 julia> findfirst(A)
 2
 
-julia> findfirst(zeros(3))
+julia> findfirst(falses(3))
 0
 ```
 """
@@ -1700,7 +1711,7 @@ Find the previous linear index <= `i` of a `true` element of `A`, or `0` if not 
 julia> A = [false false; true true]
 2×2 Array{Bool,2}:
  false  false
-  true  true
+  true   true
 
 julia> findprev(A,2)
 2
@@ -1715,7 +1726,7 @@ function findprev(A, start::Integer)
     while i >= 1
         a = A[i]
         if !warned && !(a isa Bool)
-            depwarn("In the future `findprev` will only work on boolean collections. Use `findprev(x->x!=0, A)` instead.", :findprev)
+            depwarn("In the future `findprev` will only work on boolean collections. Use `findprev(x->x!=0, A, start)` instead.", :findprev)
             warned = true
         end
         a != 0 && return i
@@ -1732,18 +1743,15 @@ Returns `0` if there is no `true` value in `A`.
 
 # Examples
 ```jldoctest
-julia> A = [1 0; 1 0]
-2×2 Array{Int64,2}:
- 1  0
- 1  0
+julia> A = [true false; true false]
+2×2 Array{Bool,2}:
+ true  false
+ true  false
 
 julia> findlast(A)
 2
 
-julia> A = zeros(2,2)
-2×2 Array{Float64,2}:
- 0.0  0.0
- 0.0  0.0
+julia> A = falses(2,2);
 
 julia> findlast(A)
 0
@@ -2224,7 +2232,6 @@ end
 findin(a, b) = _findin(a, b)
 
 # Copying subregions
-# TODO: DEPRECATE FOR #14770
 function indcopy(sz::Dims, I::Vector)
     n = length(I)
     s = sz[n]

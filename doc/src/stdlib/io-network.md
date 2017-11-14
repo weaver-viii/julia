@@ -12,7 +12,6 @@ Base.take!(::Base.GenericIOBuffer)
 Base.fdio
 Base.flush
 Base.close
-Base.crc32c(::IO, ::Integer, ::UInt32)
 Base.write
 Base.read
 Base.read!
@@ -77,10 +76,6 @@ Base.readline
 Base.readuntil
 Base.readlines
 Base.eachline
-Base.Base64.Base64EncodePipe
-Base.Base64.Base64DecodePipe
-Base.Base64.base64encode
-Base.Base64.base64decode
 Base.displaysize
 ```
 
@@ -153,9 +148,6 @@ Base.IPv6
 Base.nb_available
 Base.accept
 Base.listenany
-Base.Filesystem.poll_fd
-Base.Filesystem.poll_file
-Base.Filesystem.watch_file
 Base.bind
 Base.send
 Base.recv

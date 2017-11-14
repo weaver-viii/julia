@@ -11,6 +11,7 @@
     @test "abc" === "abc"
     @test "ab"  !== "abc"
     @test string("ab", 'c') === "abc"
+    @test string() === ""
     codegen_egal_of_strings(x, y) = (x===y, x!==y)
     @test codegen_egal_of_strings(string("ab", 'c'), "abc") === (true, false)
     let strs = ["", "a", "a b c", "до свидания"]
@@ -70,8 +71,8 @@ end
     sym = Symbol(Char(0xdcdb))
     @test string(sym) == string(Char(0xdcdb))
     @test String(sym) == string(Char(0xdcdb))
-    @test expand(Main, sym) === sym
-    res = string(parse(string(Char(0xdcdb)," = 1"),1,raise=false)[1])
+    @test Meta.lower(Main, sym) === sym
+    res = string(Meta.parse(string(Char(0xdcdb)," = 1"),1,raise=false)[1])
     @test res == """\$(Expr(:error, "invalid character \\\"\\udcdb\\\"\"))"""
 end
 
@@ -121,12 +122,14 @@ end
     @test ""[10:9] == ""
     @test "hello"[10:9] == ""
     @test "hellø"[10:9] == ""
-    @test SubString("hello", 1, 6)[10:9] == ""
+    @test SubString("hello", 1, 5)[10:9] == ""
     @test SubString("hello", 1, 0)[10:9] == ""
-    @test SubString("hellø", 1, 6)[10:9] == ""
+    @test SubString("hellø", 1, 5)[10:9] == ""
     @test SubString("hellø", 1, 0)[10:9] == ""
-    @test SubString("", 1, 6)[10:9] == ""
     @test SubString("", 1, 0)[10:9] == ""
+
+    @test_throws BoundsError SubString("", 1, 6)
+    @test_throws BoundsError SubString("", 1, 1)
 end
 
 @testset "issue #22500 (using `get()` to index strings with default returns)" begin
@@ -174,7 +177,7 @@ let s = "x\u0302"
 end
 
 @testset "issue #9781" begin
-    # float(SubString) wasn't tolerant of trailing whitespace, which was different
+    # parse(Float64, SubString) wasn't tolerant of trailing whitespace, which was different
     # to "normal" strings. This also checks we aren't being too tolerant and allowing
     # any arbitrary trailing characters.
     @test parse(Float64,"1\n") == 1.0
@@ -214,6 +217,10 @@ end
     @test gstr[1:1] == "1"
     @test gstr[[1]] == "1"
 
+    @test s"∀∃"[big(1)] == '∀'
+    @test_throws UnicodeError GenericString("∀∃")[Int8(2)]
+    @test_throws BoundsError GenericString("∀∃")[UInt16(10)]
+
     @test done(eachindex("foobar"),7)
     @test eltype(Base.EachStringIndex) == Int
     @test map(uppercase, "foó") == "FOÓ"
@@ -229,6 +236,11 @@ end
     @test nextind([1], 1) == 2
 
     @test ind2chr(gstr,2)==2
+
+    # tests promote_rule
+    let svec = [s"12", GenericString("12"), SubString("123", 1, 2)]
+        @test all(x -> x === "12", svec)
+    end
 end
 
 @testset "issue #10307" begin
@@ -549,8 +561,8 @@ end
 end
 
 @testset "unrecognized escapes in string/char literals" begin
-    @test_throws ParseError parse("\"\\.\"")
-    @test_throws ParseError parse("\'\\.\'")
+    @test_throws Meta.ParseError Meta.parse("\"\\.\"")
+    @test_throws Meta.ParseError Meta.parse("\'\\.\'")
 end
 
 @testset "prevind and nextind" begin
@@ -623,3 +635,38 @@ end
         @test prevind(strs[2], -1, 1) == 0
     end
 end
+
+@testset "first and last" begin
+    s = "∀ϵ≠0: ϵ²>0"
+    @test_throws ArgumentError first(s, -1)
+    @test first(s, 0) == ""
+    @test first(s, 1) == "∀"
+    @test first(s, 2) == "∀ϵ"
+    @test first(s, 3) == "∀ϵ≠"
+    @test first(s, 4) == "∀ϵ≠0"
+    @test first(s, length(s)) == s
+    @test_throws BoundsError first(s, length(s)+1)
+    @test_throws ArgumentError last(s, -1)
+    @test last(s, 0) == ""
+    @test last(s, 1) == "0"
+    @test last(s, 2) == ">0"
+    @test last(s, 3) == "²>0"
+    @test last(s, 4) == "ϵ²>0"
+    @test last(s, length(s)) == s
+    @test_throws BoundsError last(s, length(s)+1)
+end
+
+@testset "invalid code point" begin
+    s = String([0x61, 0xba, 0x41])
+    @test !isvalid(s)
+    @test_throws UnicodeError s[2]
+    e = try
+        s[2]
+    catch e
+        e
+    end
+    b = IOBuffer()
+    show(b, e)
+    @test String(take!(b)) == "UnicodeError: invalid character index 2 (0xba is a continuation byte)"
+end
+

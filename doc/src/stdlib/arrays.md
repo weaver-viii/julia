@@ -134,7 +134,6 @@ Base.cumprod!
 Base.cumsum
 Base.cumsum!
 Base.cumsum_kbn
-Base.crc32c
 Base.LinAlg.diff
 Base.repeat(::AbstractArray)
 Base.rot180
@@ -185,7 +184,6 @@ Base.SparseArrays.SparseMatrixCSC
 Base.SparseArrays.sparse
 Base.SparseArrays.sparsevec
 Base.SparseArrays.issparse
-Base.full
 Base.SparseArrays.nnz
 Base.SparseArrays.spzeros
 Base.SparseArrays.spones

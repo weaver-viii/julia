@@ -83,7 +83,7 @@ julia> rand(MersenneTwister(0), Dict(1=>2, 3=>4))
     The complexity of `rand(rng, s::Union{Associative,AbstractSet})`
     is linear in the length of `s`, unless an optimized method with
     constant complexity is available, which is the case for `Dict`,
-    `Set` and `IntSet`. For more than a few calls, use `rand(rng,
+    `Set` and `BitSet`. For more than a few calls, use `rand(rng,
     collect(s))` instead, or either `rand(rng, Dict(s))` or `rand(rng,
     Set(s))` as appropriate.
 """
@@ -104,11 +104,11 @@ julia> rng = MersenneTwister(1234);
 
 julia> rand!(rng, zeros(5))
 5-element Array{Float64,1}:
- 0.590845
- 0.766797
- 0.566237
- 0.460085
- 0.794026
+ 0.5908446386657102
+ 0.7667970365022592
+ 0.5662374165061859
+ 0.4600853424625171
+ 0.7940257103317943
 ```
 """
 rand!

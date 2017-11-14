@@ -784,8 +784,10 @@ end
 
 @test complex(1//2,1//3)^2 === complex(5//36, 1//3)
 @test complex(2,2)^2 === complex(0,8)
-@test_throws DomainError complex(2,2)^(-2)
-@test complex(2.0,2.0)^(-2) === complex(0.0, -0.125)
+let p = -2
+    @test_throws DomainError complex(2,2)^p
+end
+@test complex(2,2)^(-2) === complex(2.0,2.0)^(-2) === complex(0.0, -0.125)
 
 @test complex.(1.0, [1.0, 1.0]) == [complex(1.0, 1.0), complex(1.0, 1.0)]
 @test complex.([1.0, 1.0], 1.0) == [complex(1.0, 1.0), complex(1.0, 1.0)]
@@ -986,4 +988,13 @@ end
         @test isequal(one(T) / complex(one(T),  zero(T)), Complex(one(T), -zero(T)))
         @test isequal(one(T) / complex(one(T), -zero(T)), Complex(one(T),  zero(T)))
     end
+end
+
+@testset "complex^real, issue #14342" begin
+    for T in (Float32, Float64, BigFloat), p in (T(-21//10), -21//10)
+        z = T(2)+0im
+        @test real(z^p) ≈ 2^p
+        @test signbit(imag(z^p))
+    end
+    @test (2+0im)^(-21//10) === (2//1+0im)^(-21//10) === 2^-2.1 - 0.0im
 end

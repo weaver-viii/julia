@@ -12,13 +12,14 @@
 (define prec-conditional '(?))
 (define prec-arrow       (append!
                           '(-- -->)
-                          (add-dots '(← → ↔ ↚ ↛ ↠ ↣ ↦ ↮ ⇎ ⇏ ⇒ ⇔ ⇴ ⇶ ⇷ ⇸ ⇹ ⇺ ⇻ ⇼ ⇽ ⇾ ⇿ ⟵ ⟶ ⟷ ⟷ ⟹ ⟺ ⟻ ⟼ ⟽ ⟾ ⟿ ⤀ ⤁ ⤂ ⤃ ⤄ ⤅ ⤆ ⤇ ⤌ ⤍ ⤎ ⤏ ⤐ ⤑ ⤔ ⤕ ⤖ ⤗ ⤘ ⤝ ⤞ ⤟ ⤠ ⥄ ⥅ ⥆ ⥇ ⥈ ⥊ ⥋ ⥎ ⥐ ⥒ ⥓ ⥖ ⥗ ⥚ ⥛ ⥞ ⥟ ⥢ ⥤ ⥦ ⥧ ⥨ ⥩ ⥪ ⥫ ⥬ ⥭ ⥰ ⧴ ⬱ ⬰ ⬲ ⬳ ⬴ ⬵ ⬶ ⬷ ⬸ ⬹ ⬺ ⬻ ⬼ ⬽ ⬾ ⬿ ⭀ ⭁ ⭂ ⭃ ⭄ ⭇ ⭈ ⭉ ⭊ ⭋ ⭌ ￩ ￫))))
+                          (add-dots '(← → ↔ ↚ ↛ ↠ ↣ ↦ ↤ ↮ ⇎ ⇏ ⇒ ⇔ ⇴ ⇶ ⇷ ⇸ ⇹ ⇺ ⇻ ⇼ ⇽ ⇾ ⇿ ⟵ ⟶ ⟷ ⟷ ⟹ ⟺ ⟻ ⟼ ⟽ ⟾ ⟿ ⤀ ⤁ ⤂ ⤃ ⤄ ⤅ ⤆ ⤇ ⤌ ⤍ ⤎ ⤏ ⤐ ⤑ ⤔ ⤕ ⤖ ⤗ ⤘ ⤝ ⤞ ⤟ ⤠ ⥄ ⥅ ⥆ ⥇ ⥈ ⥊ ⥋ ⥎ ⥐ ⥒ ⥓ ⥖ ⥗ ⥚ ⥛ ⥞ ⥟ ⥢ ⥤ ⥦ ⥧ ⥨ ⥩ ⥪ ⥫ ⥬ ⥭ ⥰ ⧴ ⬱ ⬰ ⬲ ⬳ ⬴ ⬵ ⬶ ⬷ ⬸ ⬹ ⬺ ⬻ ⬼ ⬽ ⬾ ⬿ ⭀ ⭁ ⭂ ⭃ ⭄ ⭇ ⭈ ⭉ ⭊ ⭋ ⭌ ￩ ￫))))
 (define prec-lazy-or     '(|\|\||))
 (define prec-lazy-and    '(&&))
 (define prec-comparison
   (append! '(|<:| |>:| in isa)
            (add-dots '(> < >= ≥ <= ≤ == === ≡ != ≠ !== ≢ ∈ ∉ ∋ ∌ ⊆ ⊈ ⊂ ⊄ ⊊ ∝ ∊ ∍ ∥ ∦ ∷ ∺ ∻ ∽ ∾ ≁ ≃ ≄ ≅ ≆ ≇ ≈ ≉ ≊ ≋ ≌ ≍ ≎ ≐ ≑ ≒ ≓ ≔ ≕ ≖ ≗ ≘ ≙ ≚ ≛ ≜ ≝ ≞ ≟ ≣ ≦ ≧ ≨ ≩ ≪ ≫ ≬ ≭ ≮ ≯ ≰ ≱ ≲ ≳ ≴ ≵ ≶ ≷ ≸ ≹ ≺ ≻ ≼ ≽ ≾ ≿ ⊀ ⊁ ⊃ ⊅ ⊇ ⊉ ⊋ ⊏ ⊐ ⊑ ⊒ ⊜ ⊩ ⊬ ⊮ ⊰ ⊱ ⊲ ⊳ ⊴ ⊵ ⊶ ⊷ ⋍ ⋐ ⋑ ⋕ ⋖ ⋗ ⋘ ⋙ ⋚ ⋛ ⋜ ⋝ ⋞ ⋟ ⋠ ⋡ ⋢ ⋣ ⋤ ⋥ ⋦ ⋧ ⋨ ⋩ ⋪ ⋫ ⋬ ⋭ ⋲ ⋳ ⋴ ⋵ ⋶ ⋷ ⋸ ⋹ ⋺ ⋻ ⋼ ⋽ ⋾ ⋿ ⟈ ⟉ ⟒ ⦷ ⧀ ⧁ ⧡ ⧣ ⧤ ⧥ ⩦ ⩧ ⩪ ⩫ ⩬ ⩭ ⩮ ⩯ ⩰ ⩱ ⩲ ⩳ ⩴ ⩵ ⩶ ⩷ ⩸ ⩹ ⩺ ⩻ ⩼ ⩽ ⩾ ⩿ ⪀ ⪁ ⪂ ⪃ ⪄ ⪅ ⪆ ⪇ ⪈ ⪉ ⪊ ⪋ ⪌ ⪍ ⪎ ⪏ ⪐ ⪑ ⪒ ⪓ ⪔ ⪕ ⪖ ⪗ ⪘ ⪙ ⪚ ⪛ ⪜ ⪝ ⪞ ⪟ ⪠ ⪡ ⪢ ⪣ ⪤ ⪥ ⪦ ⪧ ⪨ ⪩ ⪪ ⪫ ⪬ ⪭ ⪮ ⪯ ⪰ ⪱ ⪲ ⪳ ⪴ ⪵ ⪶ ⪷ ⪸ ⪹ ⪺ ⪻ ⪼ ⪽ ⪾ ⪿ ⫀ ⫁ ⫂ ⫃ ⫄ ⫅ ⫆ ⫇ ⫈ ⫉ ⫊ ⫋ ⫌ ⫍ ⫎ ⫏ ⫐ ⫑ ⫒ ⫓ ⫔ ⫕ ⫖ ⫗ ⫘ ⫙ ⫷ ⫸ ⫹ ⫺ ⊢ ⊣))))
-(define prec-pipe        (add-dots '(|\|>| |<\||)))
+(define prec-pipe<       '(|.<\|| |<\||))
+(define prec-pipe>       '(|.\|>| |\|>|))
 (define prec-colon       '(: |..|))
 (define prec-plus        (append! '($)
                           (add-dots '(+ - |\|| ⊕ ⊖ ⊞ ⊟ |++| ∪ ∨ ⊔ ± ∓ ∔ ∸ ≂ ≏ ⊎ ⊻ ⊽ ⋎ ⋓ ⧺ ⧻ ⨈ ⨢ ⨣ ⨤ ⨥ ⨦ ⨧ ⨨ ⨩ ⨪ ⨫ ⨬ ⨭ ⨮ ⨹ ⨺ ⩁ ⩂ ⩅ ⩊ ⩌ ⩏ ⩐ ⩒ ⩔ ⩖ ⩗ ⩛ ⩝ ⩡ ⩢ ⩣))))
@@ -34,7 +35,7 @@
 
 (define prec-names '(prec-assignment
                      prec-conditional prec-lazy-or prec-lazy-and prec-arrow prec-comparison
-                     prec-pipe prec-colon prec-plus prec-bitshift prec-times prec-rational
+                     prec-pipe< prec-pipe> prec-colon prec-plus prec-bitshift prec-times prec-rational
                      prec-power prec-decl prec-dot))
 
 (define trans-op (string->symbol ".'"))
@@ -802,14 +803,14 @@
 (define (parse-and s)   (parse-RtoL s parse-comparison is-prec-lazy-and? #t parse-and))
 
 (define (parse-comparison s)
-  (let loop ((ex (parse-pipes s))
+  (let loop ((ex (parse-pipe< s))
              (first #t))
     (let ((t (peek-token s)))
       (cond ((is-prec-comparison? t)
              (begin (take-token s)
                     (if first
-                        (loop (list 'comparison ex t (parse-pipes s)) #f)
-                        (loop (append ex (list t (parse-pipes s))) #f))))
+                        (loop (list 'comparison ex t (parse-pipe< s)) #f)
+                        (loop (append ex (list t (parse-pipe< s))) #f))))
             (first ex)
             ((length= ex 4)
              ;; only a single comparison; special chained syntax not required
@@ -821,7 +822,8 @@
                    `(call ,op ,arg1 ,arg2))))
             (else ex)))))
 
-(define (parse-pipes s) (parse-LtoR s parse-range is-prec-pipe?))
+(define (parse-pipe< s) (parse-RtoL s parse-pipe> is-prec-pipe<? #f parse-pipe<))
+(define (parse-pipe> s) (parse-LtoR s parse-range is-prec-pipe>?))
 
 ; parse ranges and postfix ...
 ; colon is strange; 3 arguments with 2 colons yields one call:
@@ -1406,11 +1408,11 @@
        ((function macro)
         (let* ((paren (eqv? (require-token s) #\())
                (sig   (parse-def s (not (eq? word 'macro)))))
-          (if (and (eq? word 'function) (not paren) (symbol-or-interpolate? sig))
+          (if (and (not paren) (symbol-or-interpolate? sig))
               (begin (if (not (eq? (require-token s) 'end))
-                         (error (string "expected \"end\" in definition of function \"" sig "\"")))
+                         (error (string "expected \"end\" in definition of " word " \"" sig "\"")))
                      (take-token s)
-                     `(function ,sig))
+                     `(,word ,sig))
               (let* ((usig (unwrap-where sig))
                      (def  (if (or (valid-1arg-func-sig? usig)
                                    (and (assignment? usig)
@@ -1664,11 +1666,11 @@
                                     #f)
                              #t)))
                      #f))
-         (lhs (parse-pipes s))
+         (lhs (parse-pipe< s))
          (t   (peek-token s)))
     (cond ((memq t '(= in ∈))
            (take-token s)
-           (let* ((rhs (parse-pipes s))
+           (let* ((rhs (parse-pipe< s))
                   (t   (peek-token s)))
              #;(if (not (or (closing-token? t) (newline? t)))
                  ;; should be: (error "invalid iteration specification")

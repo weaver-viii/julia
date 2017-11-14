@@ -140,20 +140,20 @@ true
 """
 function lufact(A::AbstractMatrix{T}, pivot::Union{Val{false}, Val{true}}) where T
     S = typeof(zero(T)/one(T))
-    AA = similar(A, S, size(A))
+    AA = similar(A, S)
     copy!(AA, A)
     lufact!(AA, pivot)
 end
 # We can't assume an ordered field so we first try without pivoting
 function lufact(A::AbstractMatrix{T}) where T
     S = typeof(zero(T)/one(T))
-    AA = similar(A, S, size(A))
+    AA = similar(A, S)
     copy!(AA, A)
     F = lufact!(AA, Val(false))
     if issuccess(F)
         return F
     else
-        AA = similar(A, S, size(A))
+        AA = similar(A, S)
         copy!(AA, A)
         return lufact!(AA, Val(true))
     end
@@ -550,7 +550,6 @@ convert(::Type{AbstractMatrix}, F::LU) = (F[:L] * F[:U])[invperm(F[:p]),:]
 convert(::Type{AbstractArray}, F::LU) = convert(AbstractMatrix, F)
 convert(::Type{Matrix}, F::LU) = convert(Array, convert(AbstractArray, F))
 convert(::Type{Array}, F::LU) = convert(Matrix, F)
-full(F::LU) = convert(AbstractArray, F)
 
 function convert(::Type{Tridiagonal}, F::Base.LinAlg.LU{T,Tridiagonal{T,V}}) where {T,V}
     n = size(F, 1)
@@ -594,4 +593,3 @@ convert(::Type{Matrix}, F::LU{T,Tridiagonal{T,V}}) where {T,V} =
     convert(Array, convert(AbstractArray, F))
 convert(::Type{Array}, F::LU{T,Tridiagonal{T,V}}) where {T,V} =
     convert(Matrix, F)
-full(F::LU{T,Tridiagonal{T,V}}) where {T,V} = convert(AbstractArray, F)

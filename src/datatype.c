@@ -81,6 +81,7 @@ jl_datatype_t *jl_new_uninitialized_datatype(void)
     t->hasfreetypevars = 0;
     t->isleaftype = 1;
     t->layout = NULL;
+    t->names = NULL;
     return t;
 }
 
@@ -288,7 +289,7 @@ void jl_compute_field_offsets(jl_datatype_t *st)
             return;
         }
     }
-    if (st->types == NULL)
+    if (st->types == NULL || (jl_is_namedtuple_type(st) && !jl_is_leaf_type((jl_value_t*)st)))
         return;
     uint32_t nfields = jl_svec_len(st->types);
     if (nfields == 0) {
@@ -391,8 +392,6 @@ void jl_compute_field_offsets(jl_datatype_t *st)
     if (descsz >= jl_page_size) free(desc);
     jl_errorf("type %s has field offset %d that exceeds the page size", jl_symbol_name(st->name->name), descsz);
 }
-
-extern int jl_boot_file_loaded;
 
 JL_DLLEXPORT jl_datatype_t *jl_new_datatype(
         jl_sym_t *name,
@@ -734,6 +733,13 @@ JL_DLLEXPORT jl_value_t *jl_new_structv(jl_datatype_t *type, jl_value_t **args,
     for(size_t i=na; i < nf; i++) {
         if (jl_field_isptr(type, i)) {
             *(jl_value_t**)((char*)jl_data_ptr(jv)+jl_field_offset(type,i)) = NULL;
+
+        } else {
+            jl_value_t *ft = jl_field_type(type, i);
+            if (jl_is_uniontype(ft)) {
+                uint8_t *psel = &((uint8_t *)jv)[jl_field_offset(type, i) + jl_field_size(type, i) - 1];
+                *psel = 0;
+            }
         }
     }
     return jv;
@@ -845,13 +851,6 @@ JL_DLLEXPORT size_t jl_get_field_offset(jl_datatype_t *ty, int field)
     if (ty->layout == NULL || field > jl_datatype_nfields(ty) || field < 1)
         jl_bounds_error_int((jl_value_t*)ty, field);
     return jl_field_offset(ty, field - 1);
-}
-
-JL_DLLEXPORT size_t jl_get_alignment(jl_datatype_t *ty)
-{
-    if (ty->layout == NULL)
-        jl_error("non-leaf type doesn't have an alignment");
-    return jl_datatype_align(ty);
 }
 
 #ifdef __cplusplus

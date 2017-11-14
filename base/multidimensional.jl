@@ -9,6 +9,7 @@ module IteratorsMD
     import Base: +, -, *
     import Base: simd_outer_range, simd_inner_length, simd_index
     using Base: IndexLinear, IndexCartesian, AbstractCartesianIndex, fill_to_length, tail
+    using Base.Iterators: Reverse
 
     export CartesianIndex, CartesianRange
 
@@ -147,6 +148,11 @@ module IteratorsMD
         return ni
     end
 
+    # Iteration over the elements of CartesianIndex cannot be supported until its length can be inferred,
+    # see #23719
+    Base.start(::CartesianIndex) =
+        error("iteration is deliberately unsupported for CartesianIndex. Use `I` rather than `I...`, or use `Tuple(I)...`")
+
     # Iteration
     """
         CartesianRange(sz::Dims) -> R
@@ -169,14 +175,14 @@ module IteratorsMD
     # Examples
     ```jldoctest
     julia> foreach(println, CartesianRange((2, 2, 2)))
-    CartesianIndex{3}((1, 1, 1))
-    CartesianIndex{3}((2, 1, 1))
-    CartesianIndex{3}((1, 2, 1))
-    CartesianIndex{3}((2, 2, 1))
-    CartesianIndex{3}((1, 1, 2))
-    CartesianIndex{3}((2, 1, 2))
-    CartesianIndex{3}((1, 2, 2))
-    CartesianIndex{3}((2, 2, 2))
+    CartesianIndex(1, 1, 1)
+    CartesianIndex(2, 1, 1)
+    CartesianIndex(1, 2, 1)
+    CartesianIndex(2, 2, 1)
+    CartesianIndex(1, 1, 2)
+    CartesianIndex(2, 1, 2)
+    CartesianIndex(1, 2, 2)
+    CartesianIndex(2, 2, 2)
     ```
     """
     struct CartesianRange{N,R<:NTuple{N,AbstractUnitRange{Int}}}
@@ -314,6 +320,33 @@ module IteratorsMD
         i, j = split(R.indices, V)
         CartesianRange(i), CartesianRange(j)
     end
+
+    # reversed CartesianRange iteration
+    @inline function start(r::Reverse{<:CartesianRange})
+        iterfirst, iterlast = last(r.itr), first(r.itr)
+        if any(map(<, iterfirst.I, iterlast.I))
+            return iterlast-1
+        end
+        iterfirst
+    end
+    @inline function next(r::Reverse{<:CartesianRange}, state)
+        state, CartesianIndex(dec(state.I, last(r.itr).I, first(r.itr).I))
+    end
+    # decrement & carry
+    @inline dec(::Tuple{}, ::Tuple{}, ::Tuple{}) = ()
+    @inline dec(state::Tuple{Int}, start::Tuple{Int}, stop::Tuple{Int}) = (state[1]-1,)
+    @inline function dec(state, start, stop)
+        if state[1] > stop[1]
+            return (state[1]-1,tail(state)...)
+        end
+        newtail = dec(tail(state), tail(start), tail(stop))
+        (start[1], newtail...)
+    end
+    @inline done(r::Reverse{<:CartesianRange}, state) = state.I[end] < first(r.itr.indices[end])
+    # 0-d cartesian ranges are special-cased to iterate once and only once
+    start(iter::Reverse{<:CartesianRange{0}}) = false
+    next(iter::Reverse{<:CartesianRange{0}}, state) = CartesianIndex(), true
+    done(iter::Reverse{<:CartesianRange{0}}, state) = state
 end  # IteratorsMD
 
 
@@ -549,14 +582,11 @@ end
 @noinline throw_checksize_error(A, sz) = throw(DimensionMismatch("output array is the wrong size; expected $sz, got $(size(A))"))
 
 ## setindex! ##
-@generated function _setindex!(l::IndexStyle, A::AbstractArray, x, I::Union{Real, AbstractArray}...)
-    N = length(I)
-    quote
-        @_inline_meta
-        @boundscheck checkbounds(A, I...)
-        _unsafe_setindex!(l, _maybe_reshape(l, A, I...), x, I...)
-        A
-    end
+function _setindex!(l::IndexStyle, A::AbstractArray, x, I::Union{Real, AbstractArray}...)
+    @_inline_meta
+    @boundscheck checkbounds(A, I...)
+    _unsafe_setindex!(l, _maybe_reshape(l, A, I...), x, I...)
+    A
 end
 
 _iterable(v::AbstractArray) = v
@@ -916,28 +946,29 @@ function copy!(dest::AbstractArray{T,N}, src::AbstractArray{T,N}) where {T,N}
     dest
 end
 
-@generated function copy!(dest::AbstractArray{T1,N},
-                          Rdest::CartesianRange{N},
-                          src::AbstractArray{T2,N},
-                          Rsrc::CartesianRange{N}) where {T1,T2,N}
-    quote
-        isempty(Rdest) && return dest
-        if size(Rdest) != size(Rsrc)
-            throw(ArgumentError("source and destination must have same size (got $(size(Rsrc)) and $(size(Rdest)))"))
-        end
-        @boundscheck checkbounds(dest, first(Rdest))
-        @boundscheck checkbounds(dest, last(Rdest))
-        @boundscheck checkbounds(src, first(Rsrc))
-        @boundscheck checkbounds(src, last(Rsrc))
-        ΔI = first(Rdest) - first(Rsrc)
-        # TODO: restore when #9080 is fixed
-        # for I in Rsrc
-        #     @inbounds dest[I+ΔI] = src[I]
-        @nloops $N i (n->Rsrc.indices[n]) begin
-            @inbounds @nref($N,dest,n->i_n+ΔI[n]) = @nref($N,src,i)
-        end
-        dest
+function copy!(dest::AbstractArray{T1,N}, Rdest::CartesianRange{N},
+               src::AbstractArray{T2,N}, Rsrc::CartesianRange{N}) where {T1,T2,N}
+    isempty(Rdest) && return dest
+    if size(Rdest) != size(Rsrc)
+        throw(ArgumentError("source and destination must have same size (got $(size(Rsrc)) and $(size(Rdest)))"))
     end
+    @boundscheck checkbounds(dest, first(Rdest))
+    @boundscheck checkbounds(dest, last(Rdest))
+    @boundscheck checkbounds(src, first(Rsrc))
+    @boundscheck checkbounds(src, last(Rsrc))
+    ΔI = first(Rdest) - first(Rsrc)
+    if @generated
+        quote
+            @nloops $N i (n->Rsrc.indices[n]) begin
+                @inbounds @nref($N,dest,n->i_n+ΔI[n]) = @nref($N,src,i)
+            end
+        end
+    else
+        for I in Rsrc
+            @inbounds dest[I + ΔI] = src[I]
+        end
+    end
+    dest
 end
 
 """

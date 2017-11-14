@@ -62,7 +62,8 @@ static int is_wc_cat_id_start(uint32_t wc, utf8proc_category_t cat)
             cat == UTF8PROC_CATEGORY_LT || cat == UTF8PROC_CATEGORY_LM ||
             cat == UTF8PROC_CATEGORY_LO || cat == UTF8PROC_CATEGORY_NL ||
             cat == UTF8PROC_CATEGORY_SC ||  // allow currency symbols
-            cat == UTF8PROC_CATEGORY_SO ||  // other symbols
+            // other symbols, but not arrows
+            (cat == UTF8PROC_CATEGORY_SO && !(wc >= 0x2190 && wc <= 0x21FF)) ||
 
             // math symbol (category Sm) whitelist
             (wc >= 0x2140 && wc <= 0x2a1c &&
@@ -202,12 +203,22 @@ value_t fl_julia_strip_op_suffix(fl_context_t *fl_ctx, value_t *args, uint32_t n
         i = j;
     }
     if (!op[i]) return args[0]; // no suffix to strip
-    if (!i) lerror(fl_ctx, symbol(fl_ctx, "error"), "invalid operator");
+    if (!i) return args[0]; // only suffix chars --- might still be a valid identifier
     char *opnew = strncpy((char*)malloc(i+1), op, i);
     opnew[i] = 0;
     value_t opnew_symbol = symbol(fl_ctx, opnew);
     free(opnew);
     return opnew_symbol;
+}
+
+/* check whether arg is a symbol that consists solely of underscores. */
+value_t fl_julia_underscore_symbolp(fl_context_t *fl_ctx, value_t *args, uint32_t nargs)
+{
+    argcount(fl_ctx, "underscore-symbol?", nargs, 1);
+    if (!issymbol(args[0])) return fl_ctx->F;
+    char *op = symbol_name(fl_ctx, args[0]);
+    while (*op == '_') ++op;
+    return *op ? fl_ctx->F : fl_ctx->T;
 }
 
 #include "julia_charmap.h"
@@ -298,6 +309,7 @@ static const builtinspec_t julia_flisp_func_info[] = {
     { "identifier-start-char?", fl_julia_identifier_start_char },
     { "op-suffix-char?", fl_julia_op_suffix_char },
     { "strip-op-suffix", fl_julia_strip_op_suffix },
+    { "underscore-symbol?", fl_julia_underscore_symbolp },
     { NULL, NULL }
 };
 

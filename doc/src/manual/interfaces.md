@@ -136,6 +136,25 @@ define an informal interface that enable many fancier behaviors. In some cases, 
 to additionally specialize those extra behaviors when they know a more efficient algorithm can
 be used in their specific case.
 
+It is also often useful to allow iteration over a collection in *reverse order*
+by iterating over [`Iterators.reverse(iterator)`](@ref).  To actually support
+reverse-order iteration, however, an iterator
+type `T` needs to implement `start`, `next`, and `done` methods for `Iterators.Reverse{T}`.
+(Given `r::Iterators.Reverse{T}`, the underling iterator of type `T` is `r.itr`.)
+In our `Squares` example, we would implement `Iterators.Reverse{Squares}` methods:
+
+```jldoctest squaretype
+julia> Base.start(rS::Iterators.Reverse{Squares}) = rS.itr.count
+
+julia> Base.next(::Iterators.Reverse{Squares}, state) = (state*state, state-1)
+
+julia> Base.done(::Iterators.Reverse{Squares}, state) = state < 1
+
+julia> collect(Iterators.reverse(Squares(10)))' # transposed to save space
+1×10 RowVector{Int64,Array{Int64,1}}:
+ 100  81  64  49  36  25  16  9  4  1
+```
+
 ## Indexing
 
 | Methods to implement | Brief description                |
@@ -273,7 +292,7 @@ julia> s[s .> 20]
  49
 
 julia> s \ [1 2; 3 4; 5 6; 7 8; 9 10; 11 12; 13 14]
-1×2 Array{Float64,2}:
+1×2 RowVector{Float64,Array{Float64,1}}:
  0.305389  0.335329
 
 julia> s ⋅ s # dot(s, s)
@@ -289,9 +308,9 @@ julia> struct SparseArray{T,N} <: AbstractArray{T,N}
            dims::NTuple{N,Int}
        end
 
-julia> SparseArray{T}(::Type{T}, dims::Int...) = SparseArray(T, dims);
+julia> SparseArray(::Type{T}, dims::Int...) where {T} = SparseArray(T, dims);
 
-julia> SparseArray{T,N}(::Type{T}, dims::NTuple{N,Int}) = SparseArray{T,N}(Dict{NTuple{N,Int}, T}(), dims);
+julia> SparseArray(::Type{T}, dims::NTuple{N,Int}) where {T,N} = SparseArray{T,N}(Dict{NTuple{N,Int}, T}(), dims);
 
 julia> Base.size(A::SparseArray) = A.dims
 

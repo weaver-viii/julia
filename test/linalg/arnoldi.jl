@@ -20,6 +20,7 @@ using Test
                 a = areal
                 b = breal
             end
+            a_evs = eigvals(Array(a))
             a     = convert(SparseMatrixCSC{elty}, a)
             asym  = a' + a                  # symmetric indefinite
             apd   = a'*a                    # symmetric positive-definite
@@ -35,9 +36,25 @@ using Test
             @test a*v[:,2] ≈ d[2]*v[:,2]
             @test norm(v) > testtol # eigenvectors cannot be null vectors
             @test_warn "Use symbols instead of strings for specifying which eigenvalues to compute" eigs(a, which="LM")
+            @test_warn "Adjusting ncv from 1 to 4" eigs(a, ncv=1, nev=2)
+            @test_warn "Adjusting nev from $n to $(n-2)" eigs(a, nev=n)
             # (d,v) = eigs(a, b, nev=3, tol=1e-8) # not handled yet
             # @test a*v[:,2] ≈ d[2]*b*v[:,2] atol=testtol
             # @test norm(v) > testtol # eigenvectors cannot be null vectors
+            if elty <: Base.LinAlg.BlasComplex
+                sr_ind = indmin(real.(a_evs))
+                (d, v) = eigs(a, nev=1, which=:SR)
+                @test d[1] ≈ a_evs[sr_ind]
+                si_ind = indmin(imag.(a_evs))
+                (d, v) = eigs(a, nev=1, which=:SI)
+                @test d[1] ≈ a_evs[si_ind]
+                lr_ind = indmax(real.(a_evs))
+                (d, v) = eigs(a, nev=1, which=:LR)
+                @test d[1] ≈ a_evs[lr_ind]
+                li_ind = indmax(imag.(a_evs))
+                (d, v) = eigs(a, nev=1, which=:LI)
+                @test d[1] ≈ a_evs[li_ind]
+            end
 
             (d,v) = eigs(asym, nev=3)
             @test asym*v[:,1] ≈ d[1]*v[:,1]
@@ -186,7 +203,7 @@ end
     # Ensure singular values from svds are in
     # the correct order
     @testset "singular values ordered correctly" begin
-        B = sparse(diagm([1.0, 2.0, 34.0, 5.0, 6.0]))
+        B = sparse(Diagonal([1.0, 2.0, 34.0, 5.0, 6.0]))
         S3 = svds(B, ritzvec=false, nsv=2)
         @test S3[1][:S] ≈ [34.0, 6.0]
         S4 = svds(B, nsv=2)

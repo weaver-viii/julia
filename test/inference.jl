@@ -2,6 +2,20 @@
 
 # tests for Core.Inference correctness and precision
 import Core.Inference: Const, Conditional, ⊑
+const isleaftype = Core.Inference._isleaftype
+
+# demonstrate some of the type-size limits
+@test Core.Inference.limit_type_size(Ref{Complex{T} where T}, Ref, Ref, 0) == Ref
+@test Core.Inference.limit_type_size(Ref{Complex{T} where T}, Ref{Complex{T} where T}, Ref, 0) == Ref{Complex{T} where T}
+let comparison = Tuple{X, X} where X<:Tuple
+    sig = Tuple{X, X} where X<:comparison
+    ref = Tuple{X, X} where X
+    @test Core.Inference.limit_type_size(sig, comparison, comparison, 10) == comparison
+    @test Core.Inference.limit_type_size(sig, ref, comparison,  10) == comparison
+    @test Core.Inference.limit_type_size(Tuple{sig}, Tuple{ref}, comparison,  10) == Tuple{comparison}
+    @test Core.Inference.limit_type_size(sig, ref, Tuple{comparison},  10) == sig
+end
+
 
 # issue 9770
 @noinline x9770() = false
@@ -186,7 +200,6 @@ function find_tvar10930(arg)
 end
 @test find_tvar10930(Vararg{Int}) === 1
 
-const isleaftype = Base._isleaftype
 
 # issue #12474
 @generated function f12474(::Any)
@@ -872,8 +885,10 @@ f21771(::Val{U}) where {U} = Tuple{g21771(U)}
 
 # issue #21653
 # ensure that we don't try to resolve cycles using uncached edges
+# but which also means we should still be storing the inference result from inferring the cycle
 f21653() = f21653()
 @test code_typed(f21653, Tuple{}, optimize=false)[1] isa Pair{CodeInfo, typeof(Union{})}
+@test which(f21653, ()).specializations.func.rettype === Union{}
 
 # ensure _apply can "see-through" SSAValue to infer precise container types
 let f, m
@@ -883,7 +898,7 @@ let f, m
     m.source.ssavaluetypes = 1
     m.source.code = Any[
         Expr(:(=), SSAValue(0), Expr(:call, GlobalRef(Core, :svec), 1, 2, 3)),
-        Expr(:return, Expr(:call, Core._apply, :+, SSAValue(0)))
+        Expr(:return, Expr(:call, Core._apply, GlobalRef(Base, :+), SSAValue(0)))
     ]
     @test @inferred(f()) == 6
 end
@@ -980,13 +995,29 @@ copy_dims_out(out) = ()
 copy_dims_out(out, dim::Int, tail...) =  copy_dims_out((out..., dim), tail...)
 copy_dims_out(out, dim::Colon, tail...) = copy_dims_out((out..., dim), tail...)
 @test Base.return_types(copy_dims_out, (Tuple{}, Vararg{Union{Int,Colon}})) == Any[Tuple{}, Tuple{}, Tuple{}]
-@test all(m -> 2 < count_specializations(m) < 15, methods(copy_dims_out))
+@test all(m -> 20 < count_specializations(m) < 45, methods(copy_dims_out))
 
 copy_dims_pair(out) = ()
-copy_dims_pair(out, dim::Int, tail...) =  copy_dims_out(out => dim, tail...)
-copy_dims_pair(out, dim::Colon, tail...) = copy_dims_out(out => dim, tail...)
+copy_dims_pair(out, dim::Int, tail...) =  copy_dims_pair(out => dim, tail...)
+copy_dims_pair(out, dim::Colon, tail...) = copy_dims_pair(out => dim, tail...)
 @test Base.return_types(copy_dims_pair, (Tuple{}, Vararg{Union{Int,Colon}})) == Any[Tuple{}, Tuple{}, Tuple{}]
-@test all(m -> 5 < count_specializations(m) < 25, methods(copy_dims_out))
+@test all(m -> 10 < count_specializations(m) < 35, methods(copy_dims_pair))
+
+@test isdefined_tfunc(typeof(NamedTuple()), Const(0)) === Const(false)
+@test isdefined_tfunc(typeof(NamedTuple()), Const(1)) === Const(false)
+@test isdefined_tfunc(typeof((a=1,b=2)), Const(:a)) === Const(true)
+@test isdefined_tfunc(typeof((a=1,b=2)), Const(:b)) === Const(true)
+@test isdefined_tfunc(typeof((a=1,b=2)), Const(:c)) === Const(false)
+@test isdefined_tfunc(typeof((a=1,b=2)), Const(0)) === Const(false)
+@test isdefined_tfunc(typeof((a=1,b=2)), Const(1)) === Const(true)
+@test isdefined_tfunc(typeof((a=1,b=2)), Const(2)) === Const(true)
+@test isdefined_tfunc(typeof((a=1,b=2)), Const(3)) === Const(false)
+@test isdefined_tfunc(NamedTuple, Const(1)) == Bool
+@test isdefined_tfunc(NamedTuple, Symbol) == Bool
+@test Const(false) ⊑ isdefined_tfunc(NamedTuple{(:x,:y)}, Const(:z))
+@test Const(true) ⊑ isdefined_tfunc(NamedTuple{(:x,:y)}, Const(1))
+@test Const(false) ⊑ isdefined_tfunc(NamedTuple{(:x,:y)}, Const(3))
+@test Const(true) ⊑ isdefined_tfunc(NamedTuple{(:x,:y)}, Const(:y))
 
 # splatting an ::Any should still allow inference to use types of parameters preceding it
 f22364(::Int, ::Any...) = 0
@@ -1224,4 +1255,39 @@ struct T23786{D<:Tuple{Vararg{Vector{T} where T}}, N}
 end
 let t = Tuple{Type{T23786{D, N} where N where D<:Tuple{Vararg{Array{T, 1} where T, N} where N}}}
     @test Core.Inference.limit_type_depth(t, 4) >: t
+end
+
+# issue #13183
+_false13183 = false
+gg13183(x::X...) where {X} = (_false13183 ? gg13183(x, x) : 0)
+@test gg13183(5) == 0
+
+# test the external OptimizationState constructor
+let linfo = get_linfo(Base.convert, Tuple{Type{Int64}, Int32}),
+    world = typemax(UInt),
+    opt = Core.Inference.OptimizationState(linfo, Core.Inference.InferenceParams(world))
+    # make sure the state of the properties look reasonable
+    @test opt.src !== linfo.def.source
+    @test length(opt.src.slotflags) == length(opt.src.slotnames) == length(opt.src.slottypes)
+    @test opt.src.ssavaluetypes isa Vector{Any}
+    @test !opt.src.inferred
+    @test opt.mod === Base
+    @test opt.max_valid === typemax(UInt)
+    @test opt.min_valid === Core.Inference.min_world(opt.linfo) > 2
+    @test opt.nargs == 3
+end
+
+# approximate static parameters due to unions
+let T1 = Array{Float64}, T2 = Array{_1,2} where _1
+    inference_test_copy(a::T) where {T<:Array} = ccall(:jl_array_copy, Ref{T}, (Any,), a)
+    rt = Base.return_types(inference_test_copy, (Union{T1,T2},))[1]
+    @test rt >: T1 && rt >: T2
+
+    el(x::T) where {T} = eltype(T)
+    rt = Base.return_types(el, (Union{T1,Array{Float32,2}},))[1]
+    @test rt >: Union{Type{Float64}, Type{Float32}}
+
+    g(x::Ref{T}) where {T} = T
+    rt = Base.return_types(g, (Union{Ref{Array{Float64}}, Ref{Array{Float32}}},))[1]
+    @test rt >: Union{Type{Array{Float64}}, Type{Array{Float32}}}
 end

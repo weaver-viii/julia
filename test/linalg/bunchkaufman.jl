@@ -19,7 +19,7 @@ a2img  = randn(n,n)/2
 breal = randn(n,2)/2
 bimg  = randn(n,2)/2
 
-@testset for eltya in (Float32, Float64, Complex64, Complex128, Int)
+@testset "$eltya argument A" for eltya in (Float32, Float64, Complex64, Complex128, Int)
     a = eltya == Int ? rand(1:7, n, n) : convert(Matrix{eltya}, eltya <: Complex ? complex.(areal, aimg) : areal)
     a2 = eltya == Int ? rand(1:7, n, n) : convert(Matrix{eltya}, eltya <: Complex ? complex.(a2real, a2img) : a2real)
     asym = a.'+ a                  # symmetric indefinite
@@ -32,54 +32,65 @@ bimg  = randn(n,2)/2
                                 view(apd , 1:n, 1:n)))
         ε = εa = eps(abs(float(one(eltya))))
 
-        @testset for eltyb in (Float32, Float64, Complex64, Complex128, Int)
+        # check that factorize gives a Bunch-Kaufman
+        @test isa(factorize(asym), LinAlg.BunchKaufman)
+        @test isa(factorize(aher), LinAlg.BunchKaufman)
+        @testset "$uplo Bunch-Kaufman factor of indefinite matrix" for uplo in (:L, :U)
+            bc1 = bkfact(Hermitian(aher, uplo))
+            @test LinAlg.issuccess(bc1)
+            @test logabsdet(bc1)[1] ≈ log(abs(det(bc1)))
+            if eltya <: Real
+                @test logabsdet(bc1)[2] == sign(det(bc1))
+            else
+                @test logabsdet(bc1)[2] ≈ sign(det(bc1))
+            end
+            @test inv(bc1)*aher ≈ eye(n)
+            @testset for rook in (false, true)
+                @test inv(bkfact(Symmetric(a.' + a, uplo), rook))*(a.' + a) ≈ eye(n)
+                if eltya <: BlasFloat
+                    # test also bkfact! without explicit type tag
+                    # no bkfact! method for Int ... yet
+                    @test inv(bkfact!(a.' + a, rook))*(a.' + a) ≈ eye(n)
+                end
+                @test size(bc1) == size(bc1.LD)
+                @test size(bc1, 1) == size(bc1.LD, 1)
+                @test size(bc1, 2) == size(bc1.LD, 2)
+                if eltya <: BlasReal
+                    @test_throws ArgumentError bkfact(a)
+                end
+                # Test extraction of factors
+                if eltya <: Real
+                    @test bc1[uplo]*bc1[:D]*bc1[uplo]' ≈ aher[bc1[:p], bc1[:p]]
+                    @test bc1[uplo]*bc1[:D]*bc1[uplo]' ≈ bc1[:P]*aher*bc1[:P]'
+                end
+                bc1 = bkfact(Symmetric(asym, uplo))
+                @test bc1[uplo]*bc1[:D]*bc1[uplo].' ≈ asym[bc1[:p], bc1[:p]]
+                @test bc1[uplo]*bc1[:D]*bc1[uplo].' ≈ bc1[:P]*asym*bc1[:P].'
+                @test_throws KeyError bc1[:Z]
+                @test_throws ArgumentError uplo == :L ? bc1[:U] : bc1[:L]
+            end
+        end
+
+        @testset "$eltyb argument B" for eltyb in (Float32, Float64, Complex64, Complex128, Int)
             b = eltyb == Int ? rand(1:5, n, 2) : convert(Matrix{eltyb}, eltyb <: Complex ? complex.(breal, bimg) : breal)
-
-            # check that factorize gives a Bunch-Kaufman
-            @test isa(factorize(asym), LinAlg.BunchKaufman)
-            @test isa(factorize(aher), LinAlg.BunchKaufman)
-
             for b in (b, view(b, 1:n, 1:2))
                 εb = eps(abs(float(one(eltyb))))
                 ε = max(εa,εb)
 
                 @testset "$uplo Bunch-Kaufman factor of indefinite matrix" for uplo in (:L, :U)
                     bc1 = bkfact(Hermitian(aher, uplo))
-                    @test LinAlg.issuccess(bc1)
-                    @test logabsdet(bc1)[1] ≈ log(abs(det(bc1)))
-                    if eltya <: Real
-                        @test logabsdet(bc1)[2] == sign(det(bc1))
-                    else
-                        @test logabsdet(bc1)[2] ≈ sign(det(bc1))
-                    end
-                    @test inv(bc1)*aher ≈ eye(n)
                     @test aher*(bc1\b) ≈ b atol=1000ε
-                    @testset for rook in (false, true)
-                        @test inv(bkfact(Symmetric(a.' + a, uplo), rook))*(a.' + a) ≈ eye(n)
-                        @test size(bc1) == size(bc1.LD)
-                        @test size(bc1, 1) == size(bc1.LD, 1)
-                        @test size(bc1, 2) == size(bc1.LD, 2)
-                        if eltya <: BlasReal
-                            @test_throws ArgumentError bkfact(a)
-                        end
-                    end
-                    # Test extraction of factors
-                    # syconvf_rook just added to LAPACK 3.7.0. Test when we distribute LAPACK 3.7.0
-                    @test bc1[uplo]*bc1[:D]*bc1[uplo]' ≈ aher[bc1[:p], bc1[:p]]
-                    @test bc1[uplo]*bc1[:D]*bc1[uplo]' ≈ bc1[:P]*aher*bc1[:P]'
-                    if eltya <: Complex
-                        bc1 = bkfact(Symmetric(asym, uplo))
-                        @test bc1[uplo]*bc1[:D]*bc1[uplo].' ≈ asym[bc1[:p], bc1[:p]]
-                        @test bc1[uplo]*bc1[:D]*bc1[uplo].' ≈ bc1[:P]*asym*bc1[:P]'
-                    end
-                    @test_throws KeyError bc1[:Z]
-                    @test_throws ArgumentError uplo == :L ? bc1[:U] : bc1[:L]
                 end
 
                 @testset "$uplo Bunch-Kaufman factors of a pos-def matrix" for uplo in (:U, :L)
                     @testset "rook pivoting: $rook" for rook in (false, true)
                         bc2 = bkfact(Hermitian(apd, uplo), rook)
                         @test LinAlg.issuccess(bc2)
+                        bks = split(sprint(show, "text/plain", bc2), "\n")
+                        @test bks[1] == summary(bc2)
+                        @test bks[2] == "D factor:"
+                        @test bks[4+n] == "$uplo factor:"
+                        @test bks[6+2n] == "permutation:"
                         @test logdet(bc2) ≈ log(det(bc2))
                         @test logabsdet(bc2)[1] ≈ log(abs(det(bc2)))
                         @test logabsdet(bc2)[2] == sign(det(bc2))
@@ -90,26 +101,25 @@ bimg  = randn(n,2)/2
                 end
             end
         end
-    end
-end
-
-
-@testset "Bunch-Kaufman factors of a singular matrix" begin
-    let As1 = ones(n, n)
-        As2 = complex(ones(n, n))
-        As3 = complex(ones(n, n))
-        As3[end, 1] += im
-        As3[1, end] -= im
-
-        for As = (As1, As2, As3)
-            for As in (As, view(As, 1:n, 1:n))
-                @testset for rook in (false, true)
-                    @testset for uplo in (:L, :U)
-                        F = bkfact(issymmetric(As) ? Symmetric(As, uplo) : Hermitian(As, uplo), rook)
-                        @test !LinAlg.issuccess(F)
-                        @test det(F) == 0
-                        @test_throws LinAlg.SingularException inv(F)
-                        @test_throws LinAlg.SingularException F \ ones(size(As, 1))
+        if eltya <: BlasReal
+            As1 = ones(eltya, n, n)
+            As2 = complex(ones(eltya, n, n))
+            As3 = complex(ones(eltya, n, n))
+            As3[end, 1] += im/2
+            As3[1, end] -= im/2
+            for As = (As1, As2, As3)
+                for As in (As, view(As, 1:n, 1:n))
+                    @testset "$uplo Bunch-Kaufman factors of a singular matrix" for uplo in (:L, :U)
+                        @testset for rook in (false, true)
+                            F = bkfact(issymmetric(As) ? Symmetric(As, uplo) : Hermitian(As, uplo), rook)
+                            @test !LinAlg.issuccess(F)
+                            # test printing of this as well!
+                            bks = sprint(show, "text/plain", F)
+                            @test bks == "Failed factorization of type $(typeof(F))"
+                            @test det(F) == 0
+                            @test_throws LinAlg.SingularException inv(F)
+                            @test_throws LinAlg.SingularException F \ ones(size(As, 1))
+                        end
                     end
                 end
             end

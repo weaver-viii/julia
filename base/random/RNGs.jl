@@ -93,15 +93,15 @@ julia> rng = MersenneTwister(1234);
 
 julia> x1 = rand(rng, 2)
 2-element Array{Float64,1}:
- 0.590845
- 0.766797
+ 0.5908446386657102
+ 0.7667970365022592
 
 julia> rng = MersenneTwister(1234);
 
 julia> x2 = rand(rng, 2)
 2-element Array{Float64,1}:
- 0.590845
- 0.766797
+ 0.5908446386657102
+ 0.7667970365022592
 
 julia> x1 == x2
 true
@@ -235,8 +235,8 @@ rand(r::MersenneTwister, I::FloatInterval) = rand_generic(r, I)
 
 #### integers
 
-rand(r::MersenneTwister,
-     ::Type{T}) where {T<:Union{Bool,Int8,UInt8,Int16,UInt16,Int32,UInt32}} =
+rand(r::MersenneTwister, T::Union{Type{Bool}, Type{Int8}, Type{UInt8}, Type{Int16}, Type{UInt16},
+                                  Type{Int32}, Type{UInt32}}) =
     rand_ui52_raw(r) % T
 
 function rand(r::MersenneTwister, ::Type{UInt64})

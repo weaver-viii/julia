@@ -19,6 +19,19 @@ using Main.TestHelpers.OAs
         @test isa(Set(f17741(x) for x = 1:3), Set{Int})
         @test isa(Set(f17741(x) for x = -1:1), Set{Integer})
     end
+    let s1 = Set(["foo", "bar"]), s2 = Set(s1)
+        @test s1 == s2
+        x = pop!(s1)
+        @test s1 != s2
+        @test !(x in s1)
+        @test x in s2
+        push!(s1, "baz")
+        push!(s2, "baz2")
+        @test "baz" in s1
+        @test !("baz" in s2)
+        @test !("baz2" in s1)
+        @test "baz2" in s2
+    end
 end
 
 @testset "hash" begin
@@ -149,7 +162,7 @@ end
     s = Set([1,3,5,7])
     union!(s,(2,3,4,5))
     @test isequal(s,Set([1,2,3,4,5,7]))
-    @test ===(typeof(union(Set([1]), IntSet())), Set{Int})
+    @test ===(typeof(union(Set([1]), BitSet())), Set{Int})
     @test isequal(union(Set([1,2,3]), 2:4), Set([1,2,3,4]))
     @test isequal(union(Set([1,2,3]), [2,3,4]), Set([1,2,3,4]))
     @test isequal(union(Set([1,2,3]), [2,3,4], Set([5])), Set([1,2,3,4,5]))
@@ -161,7 +174,7 @@ end
     s = intersect(Set([5,6,7,8]), Set([7,8,9]))
     @test isequal(s, Set([7,8]))
     @test isequal(intersect(Set([2,3,1]), Set([4,2,3]), Set([5,4,3,2])), Set([2,3]))
-    @test ===(typeof(intersect(Set([1]), IntSet())), Set{Int})
+    @test ===(typeof(intersect(Set([1]), BitSet())), Set{Int})
     @test isequal(intersect(Set([1,2,3]), 2:10), Set([2,3]))
     @test isequal(intersect(Set([1,2,3]), [2,3,4]), Set([2,3]))
     @test isequal(intersect(Set([1,2,3]), [2,3,4], 3:4), Set([3]))
@@ -173,7 +186,7 @@ end
     @test isequal(setdiff(Set([1,2,3]), Set([1,2,3])), Set())
     @test isequal(setdiff(Set([1,2,3]), Set([4])),     Set([1,2,3]))
     @test isequal(setdiff(Set([1,2,3]), Set([4,1])),   Set([2,3]))
-    @test ===(typeof(setdiff(Set([1]), IntSet())), Set{Int})
+    @test ===(typeof(setdiff(Set([1]), BitSet())), Set{Int})
     @test isequal(setdiff(Set([1,2,3]), 2:10), Set([1]))
     @test isequal(setdiff(Set([1,2,3]), [2,3,4]), Set([1]))
     @test_throws MethodError setdiff(Set([1,2,3]), Set([2,3,4]), Set([1]))

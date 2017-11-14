@@ -120,7 +120,7 @@ export
     # key types
     Any, DataType, Vararg, ANY, NTuple,
     Tuple, Type, UnionAll, TypeName, TypeVar, Union, Void,
-    SimpleVector, AbstractArray, DenseArray,
+    SimpleVector, AbstractArray, DenseArray, NamedTuple,
     # special objects
     Function, CodeInfo, Method, MethodTable, TypeMapEntry, TypeMapLevel,
     Module, Symbol, Task, Array, WeakRef, VecElement,
@@ -130,7 +130,7 @@ export
     Signed, Int, Int8, Int16, Int32, Int64, Int128,
     Unsigned, UInt, UInt8, UInt16, UInt32, UInt64, UInt128,
     # string types
-    Char, DirectIndexString, AbstractString, String, IO,
+    Char, AbstractString, String, IO,
     # errors
     ErrorException, BoundsError, DivideError, DomainError, Exception,
     InterruptException, InexactError, OutOfMemoryError, ReadOnlyMemoryError,
@@ -274,8 +274,6 @@ struct InitError <: WrappedException
     mod::Symbol
     error
 end
-
-abstract type DirectIndexString <: AbstractString end
 
 String(s::String) = s  # no constructor yet
 
@@ -431,5 +429,33 @@ println(io::IO, @nospecialize x...) = (print(io, x...); println(io))
 show(@nospecialize a) = show(STDOUT, a)
 print(@nospecialize a...) = print(STDOUT, a...)
 println(@nospecialize a...) = println(STDOUT, a...)
+
+struct GeneratedFunctionStub
+    gen
+    argnames::Array{Any,1}
+    spnames::Union{Void, Array{Any,1}}
+    line::Int
+    file::Symbol
+end
+
+# invoke and wrap the results of @generated
+function (g::GeneratedFunctionStub)(@nospecialize args...)
+    body = g.gen(args...)
+    if body isa CodeInfo
+        return body
+    end
+    lam = Expr(:lambda, g.argnames,
+               Expr(Symbol("scope-block"),
+                    Expr(:block,
+                         LineNumberNode(g.line, g.file),
+                         Expr(:meta, :push_loc, g.file, Symbol("@generated body")),
+                         Expr(:return, body),
+                         Expr(:meta, :pop_loc))))
+    if g.spnames === nothing
+        return lam
+    else
+        return Expr(Symbol("with-static-parameters"), lam, g.spnames...)
+    end
+end
 
 ccall(:jl_set_istopmod, Void, (Any, Bool), Core, true)

@@ -8,9 +8,10 @@ using Main.TestHelpers.OAs
     @test length([1, 2, 3]) == 3
     @test count(!iszero, [1, 2, 3]) == 3
 
-    let a = ones(4), b = a+a, c = a-a
+    let a = ones(4), b = a+a, c = a-a, d = a+a+a
         @test b[1] === 2. && b[2] === 2. && b[3] === 2. && b[4] === 2.
         @test c[1] === 0. && c[2] === 0. && c[3] === 0. && c[4] === 0.
+        @test d[1] === 3. && d[2] === 3. && d[3] === 3. && d[4] === 3.
     end
 
     @test length((1,)) == 1
@@ -232,7 +233,7 @@ end
     tmp[rng...] = A[rng...]
     @test  tmp == cat(3,zeros(Int,2,3),[0 0 0; 0 47 52],zeros(Int,2,3),[0 0 0; 0 127 132])
 
-    @test cat([1,2],1,2,3.,4.,5.) == diagm([1,2,3.,4.,5.])
+    @test cat([1,2],1,2,3.,4.,5.) == diagm(0 => [1,2,3.,4.,5.])
     blk = [1 2;3 4]
     tmp = cat([1,3],blk,blk)
     @test tmp[1:2,1:2,1] == blk
@@ -411,6 +412,14 @@ end
     for i=[1,3], j=[1,4]
         @test X32[i:(i+1), j:(j+2)] == X
     end
+end
+@testset "fallback hvcat" begin
+    #Issue #23994
+    A23994 = [1 "two"; 3im 4.0; 5 6//1]
+    @test A23994[2] isa Complex{Int}
+    @test A23994[3] isa Int
+    @test A23994[5] isa Float64
+    @test A23994[6] isa Rational{Int}
 end
 @testset "end" begin
     X = [ i+2j for i=1:5, j=1:5 ]
@@ -2044,7 +2053,7 @@ end # module AutoRetType
 @testset "concatenations of dense matrices/vectors yield dense matrices/vectors" begin
     N = 4
     densevec = ones(N)
-    densemat = diagm(ones(N))
+    densemat = diagm(0 => ones(N))
     # Test that concatenations of homogeneous pairs of either dense matrices or dense vectors
     # (i.e., Matrix-Matrix concatenations, and Vector-Vector concatenations) yield dense arrays
     for densearray in (densevec, densemat)
@@ -2241,3 +2250,9 @@ end
     @test_throws BoundsError zeros(2,3,0)[2,3]
     @test_throws BoundsError checkbounds(zeros(2,3,0), 2, 3)
 end
+
+# TODO: Enable this testset after the deprecations introduced in 0.7 are removed
+# @testset "indexing by Bool values" begin
+#     @test_throws ArgumentError zeros(2)[false]
+#     @test_throws ArgumentError zeros(2)[true]
+# end

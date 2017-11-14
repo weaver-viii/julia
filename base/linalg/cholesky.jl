@@ -132,8 +132,6 @@ function _chol!(x::Number, uplo)
     rx == abs(x) ? (rval, convert(BlasInt, 0)) : (rval, convert(BlasInt, 1))
 end
 
-chol!(x::Number, uplo) = ((C, info) = _chol!(x, uplo); @assertposdef C info)
-
 # chol!. Destructive methods for computing Cholesky factor of real symmetric or Hermitian
 # matrix
 function chol!(A::RealHermSymComplexHerm{<:Real,<:StridedMatrix})
@@ -363,7 +361,6 @@ convert(::Type{AbstractMatrix}, C::Cholesky) = C.uplo == 'U' ? C[:U]'C[:U] : C[:
 convert(::Type{AbstractArray}, C::Cholesky) = convert(AbstractMatrix, C)
 convert(::Type{Matrix}, C::Cholesky) = convert(Array, convert(AbstractArray, C))
 convert(::Type{Array}, C::Cholesky) = convert(Matrix, C)
-full(C::Cholesky) = convert(AbstractArray, C)
 
 function convert(::Type{AbstractMatrix}, F::CholeskyPivoted)
     ip = invperm(F[:p])
@@ -372,7 +369,6 @@ end
 convert(::Type{AbstractArray}, F::CholeskyPivoted) = convert(AbstractMatrix, F)
 convert(::Type{Matrix}, F::CholeskyPivoted) = convert(Array, convert(AbstractArray, F))
 convert(::Type{Array}, F::CholeskyPivoted) = convert(Matrix, F)
-full(F::CholeskyPivoted) = convert(AbstractArray, F)
 
 copy(C::Cholesky) = Cholesky(copy(C.factors), C.uplo, C.info)
 copy(C::CholeskyPivoted) = CholeskyPivoted(copy(C.factors), C.uplo, C.piv, C.rank, C.tol, C.info)
@@ -408,7 +404,7 @@ function show(io::IO, C::Cholesky{<:Any,<:AbstractMatrix})
         println(io, "$(typeof(C)) with factor:")
         show(io, C[:UL])
     else
-        print("Failed factorization of type $(typeof(C))")
+        print(io, "Failed factorization of type $(typeof(C))")
     end
 end
 
@@ -460,7 +456,7 @@ function A_ldiv_B!(C::CholeskyPivoted, B::StridedMatrix)
     end
 end
 
-isposdef(C::Cholesky) = C.info == 0
+isposdef(C::Union{Cholesky,CholeskyPivoted}) = C.info == 0
 
 function det(C::Cholesky)
     isposdef(C) || throw(PosDefException(C.info))

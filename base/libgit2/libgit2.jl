@@ -36,6 +36,7 @@ include("rebase.jl")
 include("blame.jl")
 include("status.jl")
 include("tree.jl")
+include("gitcredential.jl")
 include("callbacks.jl")
 
 using .Error
@@ -262,14 +263,14 @@ function fetch(repo::GitRepo; remote::AbstractString="origin",
                remoteurl::AbstractString="",
                refspecs::Vector{<:AbstractString}=AbstractString[],
                payload::Union{CredentialPayload,Nullable{<:AbstractCredentials}}=CredentialPayload())
-    p = reset!(deprecate_nullable_creds(:fetch, "repo", payload))
+    p = reset!(deprecate_nullable_creds(:fetch, "repo", payload), GitConfig(repo))
     rmt = if isempty(remoteurl)
         get(GitRemote, repo, remote)
     else
         GitRemoteAnon(repo, remoteurl)
     end
     result = try
-        fo = FetchOptions(callbacks=RemoteCallbacks(credentials_cb(), p))
+        fo = FetchOptions(callbacks=RemoteCallbacks(credentials=credentials_cb(), payload=p))
         fetch(rmt, refspecs, msg="from $(url(rmt))", options = fo)
     catch err
         if isa(err, GitError) && err.code == Error.EAUTH
@@ -304,14 +305,14 @@ function push(repo::GitRepo; remote::AbstractString="origin",
               refspecs::Vector{<:AbstractString}=AbstractString[],
               force::Bool=false,
               payload::Union{CredentialPayload,Nullable{<:AbstractCredentials}}=CredentialPayload())
-    p = reset!(deprecate_nullable_creds(:push, "repo", payload))
+    p = reset!(deprecate_nullable_creds(:push, "repo", payload), GitConfig(repo))
     rmt = if isempty(remoteurl)
         get(GitRemote, repo, remote)
     else
         GitRemoteAnon(repo, remoteurl)
     end
     result = try
-        push_opts = PushOptions(callbacks=RemoteCallbacks(credentials_cb(), p))
+        push_opts = PushOptions(callbacks=RemoteCallbacks(credentials=credentials_cb(), payload=p))
         push(rmt, refspecs, force=force, options=push_opts)
     catch err
         if isa(err, GitError) && err.code == Error.EAUTH
@@ -522,21 +523,23 @@ function clone(repo_url::AbstractString, repo_path::AbstractString;
                payload::Union{CredentialPayload,Nullable{<:AbstractCredentials}}=CredentialPayload())
     # setup clone options
     lbranch = Base.cconvert(Cstring, branch)
-    p = reset!(deprecate_nullable_creds(:clone, "repo_url, repo_path", payload))
-    fetch_opts = FetchOptions(callbacks = RemoteCallbacks(credentials_cb(), p))
-    clone_opts = CloneOptions(
-                bare = Cint(isbare),
-                checkout_branch = isempty(lbranch) ? Cstring(C_NULL) : Base.unsafe_convert(Cstring, lbranch),
-                fetch_opts = fetch_opts,
-                remote_cb = remote_cb
-            )
-    repo = try
-        clone(repo_url, repo_path, clone_opts)
-    catch err
-        if isa(err, GitError) && err.code == Error.EAUTH
-            reject(payload)
+    @Base.gc_preserve lbranch begin
+        p = reset!(deprecate_nullable_creds(:clone, "repo_url, repo_path", payload))
+        fetch_opts = FetchOptions(callbacks = RemoteCallbacks(credentials=credentials_cb(), payload=p))
+        clone_opts = CloneOptions(
+                    bare = Cint(isbare),
+                    checkout_branch = isempty(lbranch) ? Cstring(C_NULL) : Base.unsafe_convert(Cstring, lbranch),
+                    fetch_opts = fetch_opts,
+                    remote_cb = remote_cb
+                )
+        repo = try
+            clone(repo_url, repo_path, clone_opts)
+        catch err
+            if isa(err, GitError) && err.code == Error.EAUTH
+                reject(payload)
+            end
+            rethrow()
         end
-        rethrow()
     end
     approve(payload)
     return repo

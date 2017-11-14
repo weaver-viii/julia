@@ -41,8 +41,55 @@ dimg  = randn(n)/2
         @testset "LU factorization for Number" begin
             num = rand(eltya)
             @test lu(num) == (one(eltya),num,1)
-            @test AbstractArray(lufact(num)) ≈ eltya[num]
+            @test convert(Array, lufact(num)) ≈ eltya[num]
         end
+        @testset "Balancing in eigenvector calculations" begin
+            A = convert(Matrix{eltya}, [ 3.0     -2.0      -0.9     2*eps(real(one(eltya)));
+                                       -2.0      4.0       1.0    -eps(real(one(eltya)));
+                                       -eps(real(one(eltya)))/4  eps(real(one(eltya)))/2  -1.0     0;
+                                       -0.5     -0.5       0.1     1.0])
+            F = eigfact(A, permute=false, scale=false)
+            eig(A, permute=false, scale=false)
+            @test F[:vectors]*Diagonal(F[:values])/F[:vectors] ≈ A
+            F = eigfact(A)
+            # @test norm(F[:vectors]*Diagonal(F[:values])/F[:vectors] - A) > 0.01
+        end
+    end
+    @testset "Singular LU" begin
+        lua = lufact(zeros(eltya, 3, 3))
+        @test !LinAlg.issuccess(lua)
+        @test sprint(show, lua) == "Failed factorization of type $(typeof(lua))"
+    end
+    κ  = cond(a,1)
+    @testset "(Automatic) Square LU decomposition" begin
+        lua   = factorize(a)
+        @test_throws KeyError lua[:Z]
+        l,u,p = lua[:L], lua[:U], lua[:p]
+        ll,ul,pl = lu(a)
+        @test ll * ul ≈ a[pl,:]
+        @test l*u ≈ a[p,:]
+        @test (l*u)[invperm(p),:] ≈ a
+        @test a * inv(lua) ≈ eye(n)
+        @test copy(lua) == lua
+        if eltya <: BlasFloat
+            # test conversion of LU factorization's numerical type
+            bft = eltya <: Real ? Base.LinAlg.LU{BigFloat} : Base.LinAlg.LU{Complex{BigFloat}}
+            bflua = convert(bft, lua)
+            @test bflua[:L]*bflua[:U] ≈ big.(a)[p,:] rtol=ε
+        end
+        lstring = sprint(show,l)
+        ustring = sprint(show,u)
+        @test sprint(show,lua) == "$(typeof(lua)) with factors L and U:\n$lstring\n$ustring"
+    end
+    κd    = cond(Array(d),1)
+    @testset "Tridiagonal LU" begin
+        lud   = lufact(d)
+        @test LinAlg.issuccess(lud)
+        @test lufact(lud) == lud
+        @test_throws KeyError lud[:Z]
+        @test lud[:L]*lud[:U] ≈ lud[:P]*Array(d)
+        @test lud[:L]*lud[:U] ≈ Array(d)[lud[:p],:]
+        @test AbstractArray(lud) ≈ d
     end
     @testset for eltyb in (Float32, Float64, Complex64, Complex128, Int)
         b  = eltyb == Int ? rand(1:5, n, 2) :
@@ -51,22 +98,8 @@ dimg  = randn(n)/2
             convert(Vector{eltyb}, eltyb <: Complex ? complex.(creal, cimg) : creal)
         εb = eps(abs(float(one(eltyb))))
         ε  = max(εa,εb)
-        κ  = cond(a,1)
-
         @testset "(Automatic) Square LU decomposition" begin
             lua   = factorize(a)
-            @test_throws KeyError lua[:Z]
-            l,u,p = lua[:L], lua[:U], lua[:p]
-            ll,ul,pl = lu(a)
-            @test ll * ul ≈ a[pl,:]
-            @test l*u ≈ a[p,:]
-            @test (l*u)[invperm(p),:] ≈ a
-            @test a * inv(lua) ≈ eye(n)
-            @test copy(lua) == lua
-
-            lstring = sprint(show,l)
-            ustring = sprint(show,u)
-            @test sprint(show,lua) == "$(typeof(lua)) with factors L and U:\n$lstring\n$ustring"
             let Bs = copy(b), Cs = copy(c)
                 for (bb, cc) in ((Bs, Cs), (view(Bs, 1:n, 1), view(Cs, 1:n)))
                     @test norm(a*(lua\bb) - bb, 1) < ε*κ*n*2 # Two because the right hand side has two columns
@@ -106,14 +139,7 @@ dimg  = randn(n)/2
             end
         end
         @testset "Tridiagonal LU" begin
-            κd    = cond(Array(d),1)
-            lud   = lufact(d)
-            @test LinAlg.issuccess(lud)
-            @test lufact(lud) == lud
-            @test_throws KeyError lud[:Z]
-            @test lud[:L]*lud[:U] ≈ lud[:P]*Array(d)
-            @test lud[:L]*lud[:U] ≈ Array(d)[lud[:p],:]
-            @test AbstractArray(lud) ≈ d
+            lud   = factorize(d)
             f = zeros(eltyb, n+1)
             @test_throws DimensionMismatch lud\f
             @test_throws DimensionMismatch lud.'\f
@@ -207,20 +233,6 @@ end
     end
 end
 
-@testset "Balancing in eigenvector calculations" begin
-    for elty in (Float32, Float64, Complex64, Complex128)
-        A = convert(Matrix{elty}, [ 3.0     -2.0      -0.9     2*eps(real(one(elty)));
-                                   -2.0      4.0       1.0    -eps(real(one(elty)));
-                                   -eps(real(one(elty)))/4  eps(real(one(elty)))/2  -1.0     0;
-                                   -0.5     -0.5       0.1     1.0])
-        F = eigfact(A, permute=false, scale=false)
-        eig(A, permute=false, scale=false)
-        @test F[:vectors]*Diagonal(F[:values])/F[:vectors] ≈ A
-        F = eigfact(A)
-        # @test norm(F[:vectors]*Diagonal(F[:values])/F[:vectors] - A) > 0.01
-    end
-end
-
 @testset "logdet" begin
     @test @inferred(logdet(Complex64[1.0f0 0.5f0; 0.5f0 -1.0f0])) === 0.22314355f0 + 3.1415927f0im
     @test_throws DomainError logdet([1 1; 1 -1])
@@ -228,8 +240,4 @@ end
 
 @testset "Issue 21453" begin
     @test_throws ArgumentError LinAlg._cond1Inf(lufact(randn(5,5)), 2, 2.0)
-end
-
-@testset "Singular LU" begin
-    @test !LinAlg.issuccess(lufact(zeros(3,3)))
 end

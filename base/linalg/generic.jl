@@ -739,13 +739,13 @@ of the [`eltype`](@ref) of `A`.
 julia> rank(eye(3))
 3
 
-julia> rank(diagm([1, 0, 2]))
+julia> rank(diagm(0 => [1, 0, 2]))
 2
 
-julia> rank(diagm([1, 0.001, 2]), 0.1)
+julia> rank(diagm(0 => [1, 0.001, 2]), 0.1)
 2
 
-julia> rank(diagm([1, 0.001, 2]), 0.00001)
+julia> rank(diagm(0 => [1, 0.001, 2]), 0.00001)
 3
 ```
 """
@@ -824,6 +824,11 @@ function pinv(v::AbstractVector{T}, tol::Real=real(zero(T))) where T
     end
     return res
 end
+
+# this method is just an optimization: literal negative powers of A are
+# already turned by literal_pow into powers of inv(A), but for A^-1 this
+# would turn into inv(A)^1 = copy(inv(A)), which makes an extra copy.
+@inline Base.literal_pow(::typeof(^), A::AbstractMatrix, ::Val{-1}) = inv(A)
 
 """
     \\(A, B)
@@ -1437,18 +1442,18 @@ julia> a = [1,2,4];
 
 julia> b = normalize(a)
 3-element Array{Float64,1}:
- 0.218218
- 0.436436
- 0.872872
+ 0.2182178902359924
+ 0.4364357804719848
+ 0.8728715609439696
 
 julia> norm(b)
 1.0
 
 julia> c = normalize(a, 1)
 3-element Array{Float64,1}:
- 0.142857
- 0.285714
- 0.571429
+ 0.14285714285714285
+ 0.2857142857142857
+ 0.5714285714285714
 
 julia> norm(c, 1)
 1.0

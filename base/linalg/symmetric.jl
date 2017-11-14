@@ -1,7 +1,7 @@
 # This file is a part of Julia. License is MIT: https://julialang.org/license
 
 # Symmetric and Hermitian matrices
-struct Symmetric{T,S<:AbstractMatrix} <: AbstractMatrix{T}
+struct Symmetric{T,S<:AbstractMatrix{T}} <: AbstractMatrix{T}
     data::S
     uplo::Char
 end
@@ -42,7 +42,7 @@ Note that `Supper` will not be equal to `Slower` unless `A` is itself symmetric 
 """
 Symmetric(A::AbstractMatrix, uplo::Symbol=:U) = (checksquare(A); Symmetric{eltype(A),typeof(A)}(A, char_uplo(uplo)))
 
-struct Hermitian{T,S<:AbstractMatrix} <: AbstractMatrix{T}
+struct Hermitian{T,S<:AbstractMatrix{T}} <: AbstractMatrix{T}
     data::S
     uplo::Char
 end
@@ -74,13 +74,15 @@ julia> Hlower = Hermitian(A, :L)
 ```
 
 Note that `Hupper` will not be equal to `Hlower` unless `A` is itself Hermitian (e.g. if `A == A'`).
+
+All non-real parts of the diagonal will be ignored.
+
+```julia
+Hermitian(fill(complex(1,1), 1, 1)) == fill(1, 1, 1)
+```
 """
 function Hermitian(A::AbstractMatrix, uplo::Symbol=:U)
     n = checksquare(A)
-    for i=1:n
-        isreal(A[i, i]) || throw(ArgumentError(
-            "Cannot construct Hermitian from matrix with nonreal diagonals"))
-    end
     Hermitian{eltype(A),typeof(A)}(A, char_uplo(uplo))
 end
 
@@ -113,13 +115,21 @@ size(A::HermOrSym, d) = size(A.data, d)
 size(A::HermOrSym) = size(A.data)
 @inline function getindex(A::Symmetric, i::Integer, j::Integer)
     @boundscheck checkbounds(A, i, j)
-    @inbounds r = (A.uplo == 'U') == (i < j) ? A.data[i, j] : A.data[j, i]
-    r
+    @inbounds if (A.uplo == 'U') == (i < j)
+        return A.data[i, j]
+    else
+        return A.data[j, i]
+    end
 end
 @inline function getindex(A::Hermitian, i::Integer, j::Integer)
     @boundscheck checkbounds(A, i, j)
-    @inbounds r = (A.uplo == 'U') == (i < j) ? A.data[i, j] : conj(A.data[j, i])
-    r
+    @inbounds if (A.uplo == 'U') == (i < j)
+        return A.data[i, j]
+    elseif i == j
+        return eltype(A)(real(A.data[i, j]))
+    else
+        return conj(A.data[j, i])
+    end
 end
 
 function setindex!(A::Symmetric, v, i::Integer, j::Integer)
@@ -137,22 +147,31 @@ function setindex!(A::Hermitian, v, i::Integer, j::Integer)
     end
 end
 
-similar(A::Symmetric, ::Type{T}) where {T} = Symmetric(similar(A.data, T))
-# Hermitian version can be simplified when check for imaginary part of
-# diagonal in Hermitian has been removed
+# For A<:Union{Symmetric,Hermitian}, similar(A[, neweltype]) should yield a matrix with the same
+# symmetry type, uplo flag, and underlying storage type as A. The following methods cover these cases.
+similar(A::Symmetric, ::Type{T}) where {T} = Symmetric(similar(parent(A), T), ifelse(A.uplo == 'U', :U, :L))
+# If the the Hermitian constructor's check ascertaining that the wrapped matrix's
+# diagonal is strictly real is removed, the following method can be simplified.
 function similar(A::Hermitian, ::Type{T}) where T
-    B = similar(A.data, T)
-    for i = 1:size(A,1)
-        B[i,i] = 0
-    end
-    return Hermitian(B)
+    B = similar(parent(A), T)
+    for i in 1:size(B, 1) B[i, i] = 0 end
+    return Hermitian(B, ifelse(A.uplo == 'U', :U, :L))
 end
+# On the other hand, similar(A, [neweltype,] shape...) should yield a matrix of the underlying
+# storage type of A (not wrapped in a symmetry type). The following method covers these cases.
+similar(A::Union{Symmetric,Hermitian}, ::Type{T}, dims::Dims{N}) where {T,N} = similar(parent(A), T, dims)
 
 # Conversion
 convert(::Type{Matrix}, A::Symmetric) = copytri!(convert(Matrix, copy(A.data)), A.uplo)
-convert(::Type{Matrix}, A::Hermitian) = copytri!(convert(Matrix, copy(A.data)), A.uplo, true)
+function convert(::Type{Matrix}, A::Hermitian)
+    B = copytri!(convert(Matrix, copy(A.data)), A.uplo, true)
+    for i = 1:size(A, 1)
+        B[i,i] = real(B[i,i])
+    end
+    return B
+end
 convert(::Type{Array}, A::Union{Symmetric,Hermitian}) = convert(Matrix, A)
-full(A::Union{Symmetric,Hermitian}) = convert(Array, A)
+
 parent(A::HermOrSym) = A.data
 convert(::Type{Symmetric{T,S}},A::Symmetric{T,S}) where {T,S<:AbstractMatrix} = A
 convert(::Type{Symmetric{T,S}},A::Symmetric) where {T,S<:AbstractMatrix} = Symmetric{T,S}(convert(S,A.data),A.uplo)
@@ -300,7 +319,7 @@ A_mul_B!(C::StridedMatrix{T}, A::Hermitian{T,<:StridedMatrix}, B::StridedMatrix{
 A_mul_B!(C::StridedMatrix{T}, A::StridedMatrix{T}, B::Hermitian{T,<:StridedMatrix}) where {T<:BlasComplex} =
     BLAS.hemm!('R', B.uplo, one(T), B.data, A, zero(T), C)
 
-*(A::HermOrSym, B::HermOrSym) = A*full(B)
+*(A::HermOrSym, B::HermOrSym) = A * copy!(similar(parent(B)), B)
 
 # Fallbacks to avoid generic_matvecmul!/generic_matmatmul!
 ## Symmetric{<:Number} and Hermitian{<:Real} are invariant to transpose; peel off the t
@@ -449,20 +468,20 @@ e.g. the 2nd to 8th eigenvalues.
 
 ```jldoctest
 julia> A = SymTridiagonal([1.; 2.; 1.], [2.; 3.])
-3×3 SymTridiagonal{Float64}:
+3×3 SymTridiagonal{Float64,Array{Float64,1}}:
  1.0  2.0   ⋅
  2.0  2.0  3.0
   ⋅   3.0  1.0
 
 julia> eigvals(A, 2:2)
 1-element Array{Float64,1}:
- 1.0
+ 0.9999999999999996
 
 julia> eigvals(A)
 3-element Array{Float64,1}:
- -2.14005
-  1.0
-  5.14005
+ -2.1400549446402604
+  1.0000000000000002
+  5.140054944640259
 ```
 """
 function eigvals(A::RealHermSymComplexHerm, irange::UnitRange)
@@ -488,20 +507,20 @@ by specifying a pair `vl` and `vu` for the lower and upper boundaries of the eig
 
 ```jldoctest
 julia> A = SymTridiagonal([1.; 2.; 1.], [2.; 3.])
-3×3 SymTridiagonal{Float64}:
+3×3 SymTridiagonal{Float64,Array{Float64,1}}:
  1.0  2.0   ⋅
  2.0  2.0  3.0
   ⋅   3.0  1.0
 
 julia> eigvals(A, -1, 2)
 1-element Array{Float64,1}:
- 1.0
+ 1.0000000000000009
 
 julia> eigvals(A)
 3-element Array{Float64,1}:
- -2.14005
-  1.0
-  5.14005
+ -2.1400549446402604
+  1.0000000000000002
+  5.140054944640259
 ```
 """
 function eigvals(A::RealHermSymComplexHerm, vl::Real, vh::Real)
@@ -589,27 +608,102 @@ function ^(A::Hermitian{T}, p::Real) where T
     end
 end
 
-function exp(A::Symmetric)
-    F = eigfact(A)
-    return Symmetric((F.vectors * Diagonal(exp.(F.values))) * F.vectors')
+for func in (:exp, :cos, :sin, :tan, :cosh, :sinh, :tanh, :atan, :asinh, :atanh)
+    @eval begin
+        function ($func)(A::HermOrSym{<:Real})
+            F = eigfact(A)
+            return Symmetric((F.vectors * Diagonal(($func).(F.values))) * F.vectors')
+        end
+        function ($func)(A::Hermitian{<:Complex})
+            n = checksquare(A)
+            F = eigfact(A)
+            retmat = (F.vectors * Diagonal(($func).(F.values))) * F.vectors'
+            for i = 1:n
+                retmat[i,i] = real(retmat[i,i])
+            end
+            return Hermitian(retmat)
+        end
+    end
 end
-function exp(A::Hermitian{T}) where T
+
+for func in (:acos, :asin)
+    @eval begin
+        function ($func)(A::HermOrSym{<:Real})
+            F = eigfact(A)
+            if all(λ -> -1 ≤ λ ≤ 1, F.values)
+                retmat = (F.vectors * Diagonal(($func).(F.values))) * F.vectors'
+            else
+                retmat = (F.vectors * Diagonal(($func).(complex.(F.values)))) * F.vectors'
+            end
+            return Symmetric(retmat)
+        end
+        function ($func)(A::Hermitian{<:Complex})
+            n = checksquare(A)
+            F = eigfact(A)
+            if all(λ -> -1 ≤ λ ≤ 1, F.values)
+                retmat = (F.vectors * Diagonal(($func).(F.values))) * F.vectors'
+                for i = 1:n
+                    retmat[i,i] = real(retmat[i,i])
+                end
+                return Hermitian(retmat)
+            else
+                return (F.vectors * Diagonal(($func).(complex.(F.values)))) * F.vectors'
+            end
+        end
+    end
+end
+
+function acosh(A::HermOrSym{<:Real})
+    F = eigfact(A)
+    if all(λ -> λ ≥ 1, F.values)
+        retmat = (F.vectors * Diagonal(acosh.(F.values))) * F.vectors'
+    else
+        retmat = (F.vectors * Diagonal(acosh.(complex.(F.values)))) * F.vectors'
+    end
+    return Symmetric(retmat)
+end
+function acosh(A::Hermitian{<:Complex})
     n = checksquare(A)
     F = eigfact(A)
-    retmat = (F.vectors * Diagonal(exp.(F.values))) * F.vectors'
-    if T <: Real
-        return real(Hermitian(retmat))
-    else
+    if all(λ -> λ ≥ 1, F.values)
+        retmat = (F.vectors * Diagonal(acosh.(F.values))) * F.vectors'
         for i = 1:n
             retmat[i,i] = real(retmat[i,i])
         end
         return Hermitian(retmat)
+    else
+        return (F.vectors * Diagonal(acosh.(complex.(F.values)))) * F.vectors'
     end
 end
 
+function sincos(A::HermOrSym{<:Real})
+    n = checksquare(A)
+    F = eigfact(A)
+    S, C = Diagonal(similar(A, (n,))), Diagonal(similar(A, (n,)))
+    for i in 1:n
+        S.diag[i], C.diag[i] = sincos(F.values[i])
+    end
+    return Symmetric((F.vectors * S) * F.vectors'), Symmetric((F.vectors * C) * F.vectors')
+end
+function sincos(A::Hermitian{<:Complex})
+    n = checksquare(A)
+    F = eigfact(A)
+    S, C = Diagonal(similar(A, (n,))), Diagonal(similar(A, (n,)))
+    for i in 1:n
+        S.diag[i], C.diag[i] = sincos(F.values[i])
+    end
+    retmatS, retmatC = (F.vectors * S) * F.vectors', (F.vectors * C) * F.vectors'
+    for i = 1:n
+        retmatS[i,i] = real(retmatS[i,i])
+        retmatC[i,i] = real(retmatC[i,i])
+    end
+    return Hermitian(retmatS), Hermitian(retmatC)
+end
+
+
 for func in (:log, :sqrt)
     @eval begin
-        function ($func)(A::Symmetric{T}) where T<:Real
+        function ($func)(A::HermOrSym{<:Real})
             F = eigfact(A)
             if all(λ -> λ ≥ 0, F.values)
                 retmat = (F.vectors * Diagonal(($func).(F.values))) * F.vectors'
@@ -619,19 +713,15 @@ for func in (:log, :sqrt)
             return Symmetric(retmat)
         end
 
-        function ($func)(A::Hermitian{T}) where T
+        function ($func)(A::Hermitian{<:Complex})
             n = checksquare(A)
             F = eigfact(A)
             if all(λ -> λ ≥ 0, F.values)
                 retmat = (F.vectors * Diagonal(($func).(F.values))) * F.vectors'
-                if T <: Real
-                    return Hermitian(retmat)
-                else
-                    for i = 1:n
-                        retmat[i,i] = real(retmat[i,i])
-                    end
-                    return Hermitian(retmat)
+                for i = 1:n
+                    retmat[i,i] = real(retmat[i,i])
                 end
+                return Hermitian(retmat)
             else
                 retmat = (F.vectors * Diagonal(($func).(complex(F.values)))) * F.vectors'
                 return retmat

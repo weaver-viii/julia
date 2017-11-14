@@ -79,7 +79,7 @@ true
 ```
 """
 issorted(itr;
-    lt=isless, by=identity, rev::Bool=false, order::Ordering=Forward) =
+    lt=isless, by=identity, rev::Union{Bool,Void}=nothing, order::Ordering=Forward) =
     issorted(itr, ord(lt,by,rev,order))
 
 function partialsort!(v::AbstractVector, k::Union{Int,OrdinalRange}, o::Ordering)
@@ -140,7 +140,7 @@ julia> a
 ```
 """
 partialsort!(v::AbstractVector, k::Union{Int,OrdinalRange};
-             lt=isless, by=identity, rev::Bool=false, order::Ordering=Forward) =
+             lt=isless, by=identity, rev::Union{Bool,Void}=nothing, order::Ordering=Forward) =
     partialsort!(v, k, ord(lt,by,rev,order))
 
 """
@@ -272,9 +272,8 @@ for s in [:searchsortedfirst, :searchsortedlast, :searchsorted]
     @eval begin
         $s(v::AbstractVector, x, o::Ordering) = (inds = indices(v, 1); $s(v,x,first(inds),last(inds),o))
         $s(v::AbstractVector, x;
-           lt=isless, by=identity, rev::Bool=false, order::Ordering=Forward) =
+           lt=isless, by=identity, rev::Union{Bool,Void}=nothing, order::Ordering=Forward) =
             $s(v,x,ord(lt,by,rev,order))
-        $s(v::AbstractVector, x) = $s(v, x, Forward)
     end
 end
 
@@ -604,7 +603,7 @@ function sort!(v::AbstractVector;
                alg::Algorithm=defalg(v),
                lt=isless,
                by=identity,
-               rev::Bool=false,
+               rev::Union{Bool,Void}=nothing,
                order::Ordering=Forward)
     ordr = ord(lt,by,rev,order)
     if ordr === Forward && isa(v,Vector) && eltype(v)<:Integer
@@ -695,7 +694,7 @@ function partialsortperm!(ix::AbstractVector{<:Integer}, v::AbstractVector,
                           k::Union{Int, OrdinalRange};
                           lt::Function=isless,
                           by::Function=identity,
-                          rev::Bool=false,
+                          rev::Union{Bool,Void}=nothing,
                           order::Ordering=Forward,
                           initialized::Bool=false)
     if !initialized
@@ -746,7 +745,7 @@ function sortperm(v::AbstractVector;
                   alg::Algorithm=DEFAULT_UNSTABLE,
                   lt=isless,
                   by=identity,
-                  rev::Bool=false,
+                  rev::Union{Bool,Void}=nothing,
                   order::Ordering=Forward)
     ordr = ord(lt,by,rev,order)
     if ordr === Forward && isa(v,Vector) && eltype(v)<:Integer
@@ -795,7 +794,7 @@ function sortperm!(x::AbstractVector{<:Integer}, v::AbstractVector;
                    alg::Algorithm=DEFAULT_UNSTABLE,
                    lt=isless,
                    by=identity,
-                   rev::Bool=false,
+                   rev::Union{Bool,Void}=nothing,
                    order::Ordering=Forward,
                    initialized::Bool=false)
     if indices(x,1) != indices(v,1)
@@ -834,7 +833,7 @@ end
 ## sorting multi-dimensional arrays ##
 
 """
-    sort(A, dim::Integer; alg::Algorithm=DEFAULT_UNSTABLE, lt=isless, by=identity, rev::Bool=false, order::Ordering=Forward, initialized::Bool=false)
+    sort(A, dim::Integer; alg::Algorithm=DEFAULT_UNSTABLE, lt=isless, by=identity, rev::Bool=false, order::Ordering=Forward)
 
 Sort a multidimensional array `A` along the given dimension.
 See [`sort!`](@ref) for a description of possible
@@ -862,9 +861,12 @@ function sort(A::AbstractArray, dim::Integer;
               alg::Algorithm=DEFAULT_UNSTABLE,
               lt=isless,
               by=identity,
-              rev::Bool=false,
+              rev::Union{Bool,Void}=nothing,
               order::Ordering=Forward,
-              initialized::Bool=false)
+              initialized::Union{Bool,Void}=nothing)
+    if initialized !== nothing
+        Base.depwarn("`initialized` keyword argument is deprecated", :sort)
+    end
     order = ord(lt,by,rev,order)
     n = length(indices(A, dim))
     if dim != 1

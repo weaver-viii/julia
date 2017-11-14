@@ -260,7 +260,7 @@ Example:
 
 ```jldoctest
 julia> x = reshape(1:16, 4, 4)
-4×4 Base.ReshapedArray{Int64,2,UnitRange{Int64},Tuple{}}:
+4×4 reshape(::UnitRange{Int64}, 4, 4) with eltype Int64:
  1  5   9  13
  2  6  10  14
  3  7  11  15
@@ -444,7 +444,7 @@ indices directly instead of first calling [`find`](@ref).
 
 ```jldoctest
 julia> x = reshape(1:16, 4, 4)
-4×4 Base.ReshapedArray{Int64,2,UnitRange{Int64},Tuple{}}:
+4×4 reshape(::UnitRange{Int64}, 4, 4) with eltype Int64:
  1  5   9  13
  2  6  10  14
  3  7  11  15
@@ -497,12 +497,12 @@ julia> B = view(A, 1:3, 2:3);
 julia> for i in eachindex(B)
            @show i
        end
-i = CartesianIndex{2}((1, 1))
-i = CartesianIndex{2}((2, 1))
-i = CartesianIndex{2}((3, 1))
-i = CartesianIndex{2}((1, 2))
-i = CartesianIndex{2}((2, 2))
-i = CartesianIndex{2}((3, 2))
+i = CartesianIndex(1, 1)
+i = CartesianIndex(2, 1)
+i = CartesianIndex(3, 1)
+i = CartesianIndex(1, 2)
+i = CartesianIndex(2, 2)
+i = CartesianIndex(3, 2)
 ```
 
 In contrast with `for i = 1:length(A)`, iterating with `eachindex` provides an efficient way to
@@ -837,7 +837,7 @@ julia> findn(S)
 julia> findnz(R)
 ([1, 3, 4, 5], [1, -5, 2, 3])
 
-julia> findn(R)
+julia> find(!iszero, R)
 4-element Array{Int64,1}:
  1
  3
@@ -896,7 +896,7 @@ section of the standard library reference.
 | [`spzeros(m,n)`](@ref)     | [`zeros(m,n)`](@ref)   | Creates a *m*-by-*n* matrix of zeros. ([`spzeros(m,n)`](@ref) is empty.)                                                                                              |
 | [`spones(S)`](@ref)        | [`ones(m,n)`](@ref)    | Creates a matrix filled with ones. Unlike the dense version, [`spones`](@ref) has the same sparsity pattern as *S*.                                                 |
 | [`speye(n)`](@ref)         | [`eye(n)`](@ref)       | Creates a *n*-by-*n* identity matrix.                                                                                                                                 |
-| [`full(S)`](@ref)          | [`sparse(A)`](@ref)    | Interconverts between dense and sparse formats.                                                                                                                       |
+| [`Array(S)`](@ref)         | [`sparse(A)`](@ref)    | Interconverts between dense and sparse formats.                                                                                                                       |
 | [`sprand(m,n,d)`](@ref)    | [`rand(m,n)`](@ref)    | Creates a *m*-by-*n* random matrix (of density *d*) with iid non-zero elements distributed uniformly on the half-open interval ``[0, 1)``.                            |
 | [`sprandn(m,n,d)`](@ref)   | [`randn(m,n)`](@ref)   | Creates a *m*-by-*n* random matrix (of density *d*) with iid non-zero elements distributed according to the standard normal (Gaussian) distribution.                  |
 | [`sprandn(m,n,d,X)`](@ref) | [`randn(m,n,X)`](@ref) | Creates a *m*-by-*n* random matrix (of density *d*) with iid non-zero elements distributed according to the *X* distribution. (Requires the `Distributions` package.) |

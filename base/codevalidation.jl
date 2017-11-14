@@ -10,7 +10,6 @@ const VALID_EXPR_HEADS = ObjectIdDict(
     :(=) => 2:2,
     :method => 1:4,
     :const => 1:1,
-    :null => 0:0, # TODO from @vtjnash: remove this + any :null handling code in Base
     :new => 1:typemax(Int),
     :return => 1:1,
     :the_exception => 0:0,
@@ -57,8 +56,8 @@ InvalidCodeError(kind::AbstractString) = InvalidCodeError(kind, nothing)
 Validate `c`, logging any violation by pushing an `InvalidCodeError` into `errors`.
 """
 function validate_code!(errors::Vector{>:InvalidCodeError}, c::CodeInfo, is_top_level::Bool = false)
-    ssavals = IntSet()
-    lhs_slotnums = IntSet()
+    ssavals = BitSet()
+    lhs_slotnums = BitSet()
     walkast(c.code) do x
         if isa(x, Expr)
             !is_top_level && x.head == :method && push!(errors, InvalidCodeError(NON_TOP_LEVEL_METHOD))
@@ -87,7 +86,7 @@ function validate_code!(errors::Vector{>:InvalidCodeError}, c::CodeInfo, is_top_
                 end
             end
         elseif isa(x, SSAValue)
-            id = x.id + 1 # ensures that id > 0 for use with IntSet
+            id = x.id + 1 # ensures that id > 0 for use with BitSet
             !in(id, ssavals) && push!(ssavals, id)
         end
     end

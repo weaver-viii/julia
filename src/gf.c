@@ -208,7 +208,7 @@ void jl_mk_builtin_func(jl_datatype_t *dt, const char *name, jl_fptr_t fptr)
     }
     jl_method_instance_t *li = jl_new_method_instance_uninit();
     li->fptr = fptr;
-    li->jlcall_api = 1;
+    li->jlcall_api = JL_API_GENERIC;
     li->specTypes = (jl_value_t*)jl_anytuple_type;
     li->min_world = 1;
     li->max_world = ~(size_t)0;
@@ -412,7 +412,7 @@ JL_DLLEXPORT jl_method_instance_t* jl_set_method_inferred(
     jl_gc_wb(li, inferred);
     if (const_flags & 1) {
         assert(const_flags & 2);
-        li->jlcall_api = 2;
+        li->jlcall_api = JL_API_CONST;
     }
     if (const_flags & 2) {
         li->inferred_const = inferred_const;
@@ -1348,7 +1348,7 @@ static int invalidate_backedges(jl_typemap_entry_t *oldentry, struct typemap_int
 // add a backedge from callee to caller
 JL_DLLEXPORT void jl_method_instance_add_backedge(jl_method_instance_t *callee, jl_method_instance_t *caller)
 {
-    assert(callee->min_world <= caller->min_world && callee->max_world >= caller->max_world);
+    assert(callee->def.method->min_world <= caller->min_world && callee->max_world >= caller->max_world);
     JL_LOCK(&callee->def.method->writelock);
     if (!callee->backedges) {
         // lazy-init the backedges array
@@ -1420,6 +1420,12 @@ JL_DLLEXPORT void jl_method_table_insert(jl_methtable_t *mt, jl_method_t *method
             (jl_tupletype_t*)type, simpletype, jl_emptysvec, (jl_value_t*)method, 0, &method_defs,
             method->min_world, ~(size_t)0, &oldvalue);
     if (oldvalue) {
+        if (oldvalue == (jl_value_t*)method) {
+            // redundant add of same method; no need to do anything
+            JL_UNLOCK(&mt->writelock);
+            JL_GC_POP();
+            return;
+        }
         method->ambig = ((jl_method_t*)oldvalue)->ambig;
         method_overwrite(newentry, (jl_method_t*)oldvalue);
     }
@@ -1647,14 +1653,14 @@ JL_DLLEXPORT jl_value_t *jl_matching_methods(jl_tupletype_t *types, int lim, int
 jl_llvm_functions_t jl_compile_for_dispatch(jl_method_instance_t **pli, size_t world)
 {
     jl_method_instance_t *li = *pli;
-    if (li->jlcall_api == 2)
+    if (li->jlcall_api == JL_API_CONST)
         return li->functionObjectsDecls;
     if (jl_options.compile_enabled == JL_OPTIONS_COMPILE_OFF ||
         jl_options.compile_enabled == JL_OPTIONS_COMPILE_MIN) {
         // copy fptr from the template method definition
         jl_method_t *def = li->def.method;
         if (jl_is_method(def) && def->unspecialized) {
-            if (def->unspecialized->jlcall_api == 2) {
+            if (def->unspecialized->jlcall_api == JL_API_CONST) {
                 li->functionObjectsDecls.functionObject = NULL;
                 li->functionObjectsDecls.specFunctionObject = NULL;
                 li->inferred = def->unspecialized->inferred;
@@ -1662,7 +1668,7 @@ jl_llvm_functions_t jl_compile_for_dispatch(jl_method_instance_t **pli, size_t w
                 li->inferred_const = def->unspecialized->inferred_const;
                 if (li->inferred_const)
                     jl_gc_wb(li, li->inferred_const);
-                li->jlcall_api = 2;
+                li->jlcall_api = JL_API_CONST;
                 return li->functionObjectsDecls;
             }
             if (def->unspecialized->fptr) {
@@ -1674,13 +1680,20 @@ jl_llvm_functions_t jl_compile_for_dispatch(jl_method_instance_t **pli, size_t w
             }
         }
         if (jl_options.compile_enabled == JL_OPTIONS_COMPILE_OFF) {
-            jl_printf(JL_STDERR, "code missing for ");
-            jl_static_show(JL_STDERR, (jl_value_t*)li);
-            jl_printf(JL_STDERR, " : sysimg may not have been built with --compile=all\n");
+            jl_code_info_t *src = jl_code_for_interpreter(li);
+            if (!jl_code_requires_compiler(src)) {
+                li->inferred = (jl_value_t*)src;
+                jl_gc_wb(li, src);
+                li->functionObjectsDecls.functionObject = NULL;
+                li->functionObjectsDecls.specFunctionObject = NULL;
+                li->fptr = (jl_fptr_t)&jl_interpret_call;
+                li->jlcall_api = JL_API_INTERPRETED;
+                return li->functionObjectsDecls;
+            }
         }
     }
     jl_llvm_functions_t decls = li->functionObjectsDecls;
-    if (decls.functionObject != NULL || li->jlcall_api == 2)
+    if (decls.functionObject != NULL || li->jlcall_api == JL_API_CONST)
         return decls;
 
     jl_code_info_t *src = NULL;
@@ -1693,7 +1706,7 @@ jl_llvm_functions_t jl_compile_for_dispatch(jl_method_instance_t **pli, size_t w
     }
     // check again, because jl_type_infer may have changed li or compiled it
     decls = li->functionObjectsDecls;
-    if (decls.functionObject != NULL || li->jlcall_api == 2)
+    if (decls.functionObject != NULL || li->jlcall_api == JL_API_CONST)
         return decls;
     return jl_compile_linfo(&li, src, world, &jl_default_cgparams);
 }
@@ -1758,8 +1771,25 @@ JL_DLLEXPORT int jl_compile_hint(jl_tupletype_t *types)
     jl_code_info_t *src = NULL;
     if (!jl_is_rettype_inferred(li))
         src = jl_type_infer(&li, world, 0);
-    if (li->jlcall_api != 2)
-        jl_compile_linfo(&li, src, world, &jl_default_cgparams);
+    if (li->jlcall_api != JL_API_CONST) {
+        if (jl_options.outputo || jl_options.outputbc || jl_options.outputunoptbc) {
+            // If we are saving LLVM or native code, generate the LLVM IR so that it'll
+            // be included in the saved LLVM module.
+            jl_compile_linfo(&li, src, world, &jl_default_cgparams);
+        }
+        else if (!jl_options.outputji) {
+            // If we are only saving ji files (e.g. package pre-compilation for now),
+            // don't bother generating anything since it won't be saved.
+            // Otherwise (this branch), assuming we are at runtime (normal JIT) and
+            // we should generate the native code.
+            jl_ptls_t ptls = jl_get_ptls_states();
+            size_t last_age = ptls->world_age;
+            ptls->world_age = world;
+            jl_generic_fptr_t fptr;
+            jl_compile_method_internal(&fptr, li);
+            ptls->world_age = last_age;
+        }
+    }
     return 1;
 }
 
@@ -2375,6 +2405,8 @@ int jl_has_concrete_subtype(jl_value_t *typ)
         typ = jl_unwrap_vararg(typ);
     if (!jl_is_datatype(typ))
         return 1;
+    if (((jl_datatype_t*)typ)->name == jl_namedtuple_typename)
+        return jl_has_concrete_subtype(jl_tparam1(typ));
     jl_svec_t *fields = ((jl_datatype_t*)typ)->types;
     size_t i, l = jl_svec_len(fields);
     if (l != ((jl_datatype_t*)typ)->ninitialized)

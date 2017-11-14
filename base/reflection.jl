@@ -52,7 +52,7 @@ julia> fullname(Base.Pkg)
 (:Base, :Pkg)
 
 julia> fullname(Main)
-()
+(:Main,)
 ```
 """
 function fullname(m::Module)
@@ -126,7 +126,15 @@ julia> fieldname(SparseMatrixCSC, 5)
 :nzval
 ```
 """
-fieldname(t::DataType, i::Integer) = t.name.names[i]::Symbol
+function fieldname(t::DataType, i::Integer)
+    names = isdefined(t, :names) ? t.names : t.name.names
+    n_fields = length(names)
+    field_label = n_fields == 1 ? "field" : "fields"
+    i > n_fields && throw(ArgumentError("Cannot access field $i since type $t only has $n_fields $field_label."))
+    i < 1 && throw(ArgumentError("Field numbers must be positive integers. $i is invalid."))
+    return names[i]::Symbol
+end
+
 fieldname(t::UnionAll, i::Integer) = fieldname(unwrap_unionall(t), i)
 fieldname(t::Type{<:Tuple}, i::Integer) =
     i < 1 || i > fieldcount(t) ? throw(BoundsError(t, i)) : Int(i)
@@ -454,8 +462,6 @@ function fieldindex(T::DataType, name::Symbol, err::Bool=true)
     return Int(ccall(:jl_field_index, Cint, (Any, Any, Cint), T, name, err)+1)
 end
 
-type_alignment(x::DataType) = (@_pure_meta; ccall(:jl_get_alignment, Csize_t, (Any,), x))
-
 """
     fieldcount(t::Type)
 
@@ -475,7 +481,19 @@ function fieldcount(@nospecialize t)
     if !(t isa DataType)
         throw(TypeError(:fieldcount, "", Type, t))
     end
-    if t.abstract || (t.name === Tuple.name && isvatuple(t))
+    if t.name === NamedTuple.body.body.name
+        names, types = t.parameters
+        if names isa Tuple
+            return length(names)
+        end
+        if types isa DataType && types <: Tuple
+            return fieldcount(types)
+        end
+        abstr = true
+    else
+        abstr = t.abstract || (t.name === Tuple.name && isvatuple(t))
+    end
+    if abstr
         error("type does not have a definite number of fields")
     end
     return length(t.types)
@@ -491,10 +509,10 @@ enumerated types (see `@enum`).
 
 # Example
 ```jldoctest
-julia> @enum Colors Red Blue Green
+julia> @enum Color red blue green
 
-julia> instances(Colors)
-(Red::Colors = 0, Blue::Colors = 1, Green::Colors = 2)
+julia> instances(Color)
+(red::Color = 0, blue::Color = 1, green::Color = 2)
 ```
 """
 function instances end
@@ -559,8 +577,7 @@ are included, including those not visible in the current module.
 # Examples
 ```jldoctest
 julia> subtypes(Integer)
-4-element Array{Union{DataType, UnionAll},1}:
- BigInt
+3-element Array{Union{DataType, UnionAll},1}:
  Bool
  Signed
  Unsigned
@@ -592,12 +609,13 @@ end
 """
     code_lowered(f, types, expand_generated = true)
 
-Return an array of lowered ASTs for the methods matching the given generic function and type signature.
+Return an array of the lowered forms (IR) for the methods matching the given generic function
+and type signature.
 
-If `expand_generated` is `false`, then the `CodeInfo` instances returned for `@generated`
-methods will correspond to the generators' lowered ASTs. If `expand_generated` is `true`,
-these `CodeInfo` instances will correspond to the lowered ASTs of the method bodies yielded
-by expanding the generators.
+If `expand_generated` is `false`, the returned `CodeInfo` instances will correspond to fallback
+implementations. An error is thrown if no fallback implementation exists.
+If `expand_generated` is `true`, these `CodeInfo` instances will correspond to the method bodies
+yielded by expanding the generators.
 
 Note that an error will be thrown if `types` are not leaf types when `expand_generated` is
 `true` and the corresponding method is a `@generated` method.
@@ -732,7 +750,9 @@ function length(mt::MethodTable)
 end
 isempty(mt::MethodTable) = (mt.defs === nothing)
 
-uncompressed_ast(m::Method) = uncompressed_ast(m, isdefined(m, :source) ? m.source : m.generator.inferred)
+uncompressed_ast(m::Method) = isdefined(m,:source) ? uncompressed_ast(m, m.source) :
+                              isdefined(m,:generator) ? error("Method is @generated; try `code_lowered` instead.") :
+                              error("Code for this Method is not available.")
 uncompressed_ast(m::Method, s::CodeInfo) = s
 uncompressed_ast(m::Method, s::Array{UInt8,1}) = ccall(:jl_uncompress_ast, Any, (Any, Any), m, s)::CodeInfo
 uncompressed_ast(m::Core.MethodInstance) = uncompressed_ast(m.def)
@@ -846,7 +866,7 @@ code_native(::IO, ::Any, ::Symbol) = error("illegal code_native call") # resolve
 
 # give a decent error message if we try to instantiate a staged function on non-leaf types
 function func_for_method_checked(m::Method, @nospecialize types)
-    if isdefined(m,:generator) && !isdefined(m,:source) && !_isleaftype(types)
+    if isdefined(m,:generator) && !_isleaftype(types)
         error("cannot call @generated function `", m, "` ",
               "with abstract argument types: ", types)
     end
@@ -856,7 +876,7 @@ end
 """
     code_typed(f, types; optimize=true)
 
-Returns an array of lowered and type-inferred ASTs for the methods matching the given
+Returns an array of type-inferred lowered form (IR) for the methods matching the given
 generic function and type signature. The keyword argument `optimize` controls whether
 additional optimizations, such as inlining, are also applied.
 """

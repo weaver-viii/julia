@@ -265,9 +265,9 @@ The following functions are available for the `QR` objects: [`inv`](@ref), [`siz
 and [`\\`](@ref). When `A` is rectangular, `\\` will return a least squares
 solution and if the solution is not unique, the one with smallest norm is returned.
 
-Multiplication with respect to either thin or full `Q` is allowed, i.e. both `F[:Q]*F[:R]`
+Multiplication with respect to either full/square or non-full/square `Q` is allowed, i.e. both `F[:Q]*F[:R]`
 and `F[:Q]*A` are supported. A `Q` matrix can be converted into a regular matrix with
-[`full`](@ref) which has a named argument `thin`.
+[`Matrix`](@ref).
 
 # Examples
 ```jldoctest
@@ -305,24 +305,33 @@ end
 qrfact(x::Number) = qrfact(fill(x,1,1))
 
 """
-    qr(A, pivot=Val(false); thin::Bool=true) -> Q, R, [p]
+    qr(A, pivot=Val(false); full::Bool = false) -> Q, R, [p]
 
 Compute the (pivoted) QR factorization of `A` such that either `A = Q*R` or `A[:,p] = Q*R`.
 Also see [`qrfact`](@ref).
-The default is to compute a thin factorization. Note that `R` is not
-extended with zeros when the full `Q` is requested.
+The default is to compute a "thin" factorization. Note that `R` is not
+extended with zeros when a full/square orthogonal factor `Q` is requested (via `full = true`).
 """
-qr(A::Union{Number, AbstractMatrix}, pivot::Union{Val{false}, Val{true}}=Val(false); thin::Bool=true) =
-    _qr(A, pivot, thin=thin)
-function _qr(A::Union{Number, AbstractMatrix}, ::Val{false}; thin::Bool=true)
+function qr(A::Union{Number,AbstractMatrix}, pivot::Union{Val{false},Val{true}} = Val(false);
+            full::Bool = false, thin::Union{Bool,Void} = nothing)
+    # DEPRECATION TODO: remove deprecated thin argument and associated logic after 0.7
+    if thin != nothing
+        Base.depwarn(string("the `thin` keyword argument in `qr(A, pivot; thin = $(thin))` has ",
+            "been deprecated in favor of `full`, which has the opposite meaning, ",
+            "e.g. `qr(A, pivot; full = $(!thin))`."), :qr)
+        full::Bool = !thin
+    end
+    return _qr(A, pivot, full = full)
+end
+function _qr(A::Union{Number,AbstractMatrix}, ::Val{false}; full::Bool = false)
     F = qrfact(A, Val(false))
     Q, R = getq(F), F[:R]::Matrix{eltype(F)}
-    return (thin ? Array(Q) : A_mul_B!(Q, eye(eltype(Q), size(Q.factors, 1)))), R
+    return (!full ? Array(Q) : A_mul_B!(Q, eye(eltype(Q), size(Q.factors, 1)))), R
 end
-function _qr(A::Union{Number, AbstractMatrix}, ::Val{true}; thin::Bool=true)
+function _qr(A::Union{Number, AbstractMatrix}, ::Val{true}; full::Bool = false)
     F = qrfact(A, Val(true))
     Q, R, p = getq(F), F[:R]::Matrix{eltype(F)}, F[:p]::Vector{BlasInt}
-    return (thin ? Array(Q) : A_mul_B!(Q, eye(eltype(Q), size(Q.factors, 1)))), R, p
+    return (!full ? Array(Q) : A_mul_B!(Q, eye(eltype(Q), size(Q.factors, 1)))), R, p
 end
 
 """
@@ -401,7 +410,6 @@ convert(::Type{AbstractMatrix}, F::Union{QR,QRCompactWY}) = F[:Q] * F[:R]
 convert(::Type{AbstractArray}, F::Union{QR,QRCompactWY}) = convert(AbstractMatrix, F)
 convert(::Type{Matrix}, F::Union{QR,QRCompactWY}) = convert(Array, convert(AbstractArray, F))
 convert(::Type{Array}, F::Union{QR,QRCompactWY}) = convert(Matrix, F)
-full(F::Union{QR,QRCompactWY}) = convert(AbstractArray, F)
 convert(::Type{QRPivoted{T}}, A::QRPivoted) where {T} = QRPivoted(convert(AbstractMatrix{T}, A.factors), convert(Vector{T}, A.τ), A.jpvt)
 convert(::Type{Factorization{T}}, A::QRPivoted{T}) where {T} = A
 convert(::Type{Factorization{T}}, A::QRPivoted) where {T} = convert(QRPivoted{T}, A)
@@ -409,7 +417,6 @@ convert(::Type{AbstractMatrix}, F::QRPivoted) = (F[:Q] * F[:R])[:,invperm(F[:p])
 convert(::Type{AbstractArray}, F::QRPivoted) = convert(AbstractMatrix, F)
 convert(::Type{Matrix}, F::QRPivoted) = convert(Array, convert(AbstractArray, F))
 convert(::Type{Array}, F::QRPivoted) = convert(Matrix, F)
-full(F::QRPivoted) = convert(AbstractArray, F)
 
 function show(io::IO, F::Union{QR, QRCompactWY, QRPivoted})
     println(io, "$(typeof(F)) with factors Q and R:")
@@ -499,58 +506,6 @@ convert(::Type{AbstractMatrix{S}}, Q::QRCompactWYQ{S}) where {S} = Q
 convert(::Type{AbstractMatrix{S}}, Q::QRCompactWYQ) where {S} = convert(QRCompactWYQ{S}, Q)
 convert(::Type{Matrix}, A::AbstractQ{T}) where {T} = A_mul_B!(A, eye(T, size(A.factors, 1), min(size(A.factors)...)))
 convert(::Type{Array}, A::AbstractQ) = convert(Matrix, A)
-
-"""
-    full(A::AbstractQ; thin::Bool=true) -> Matrix
-
-Converts an orthogonal or unitary matrix stored as a `QRCompactWYQ` object, i.e. in the
-compact WY format [^Bischof1987], or in the `QRPackedQ` format, to a dense matrix.
-
-Optionally takes a `thin` Boolean argument, which if `true` omits the columns that span the
-rows of `R` in the QR factorization that are zero. The resulting matrix is the `Q` in a thin
-QR factorization (sometimes called the reduced QR factorization). If `false`, returns a `Q`
-that spans all rows of `R` in its corresponding QR factorization.
-
-# Examples
-```jldoctest
-julia> a = [1. 2.; 3. 4.; 5. 6.];
-
-julia> qra = qrfact(a, Val(true));
-
-julia> full(qra[:Q], thin=true)
-3×2 Array{Float64,2}:
- -0.267261   0.872872
- -0.534522   0.218218
- -0.801784  -0.436436
-
-julia> full(qra[:Q], thin=false)
-3×3 Array{Float64,2}:
- -0.267261   0.872872   0.408248
- -0.534522   0.218218  -0.816497
- -0.801784  -0.436436   0.408248
-
-julia> qra = qrfact(a, Val(false));
-
-julia> full(qra[:Q], thin=true)
-3×2 Array{Float64,2}:
- -0.169031   0.897085
- -0.507093   0.276026
- -0.845154  -0.345033
-
-julia> full(qra[:Q], thin=false)
-3×3 Array{Float64,2}:
- -0.169031   0.897085   0.408248
- -0.507093   0.276026  -0.816497
- -0.845154  -0.345033   0.408248
-```
-"""
-function full(A::AbstractQ{T}; thin::Bool = true) where T
-    if thin
-        convert(Array, A)
-    else
-        A_mul_B!(A, eye(T, size(A.factors, 1)))
-    end
-end
 
 size(A::Union{QR,QRCompactWY,QRPivoted}, dim::Integer) = size(A.factors, dim)
 size(A::Union{QR,QRCompactWY,QRPivoted}) = size(A.factors)
@@ -769,17 +724,18 @@ end
 A_ldiv_B!(A::QRCompactWY{T}, b::StridedVector{T}) where {T<:BlasFloat} = (A_ldiv_B!(UpperTriangular(A[:R]), view(Ac_mul_B!(A[:Q], b), 1:size(A, 2))); b)
 A_ldiv_B!(A::QRCompactWY{T}, B::StridedMatrix{T}) where {T<:BlasFloat} = (A_ldiv_B!(UpperTriangular(A[:R]), view(Ac_mul_B!(A[:Q], B), 1:size(A, 2), 1:size(B, 2))); B)
 
-# Julia implementation similarly to xgelsy
+# Julia implementation similar to xgelsy
 function A_ldiv_B!(A::QRPivoted{T}, B::StridedMatrix{T}, rcond::Real) where T<:BlasFloat
     mA, nA = size(A.factors)
     nr = min(mA,nA)
     nrhs = size(B, 2)
     if nr == 0
-        return zeros(T, 0, nrhs), 0
+        return B, 0
     end
     ar = abs(A.factors[1])
     if ar == 0
-        return zeros(T, nA, nrhs), 0
+        B[1:nA, :] = 0
+        return B, 0
     end
     rnk = 1
     xmin = ones(T, 1)
@@ -873,23 +829,8 @@ _cut_B(x::AbstractVector, r::UnitRange) = length(x)  > length(r) ? x[r]   : x
 _cut_B(X::AbstractMatrix, r::UnitRange) = size(X, 1) > length(r) ? X[r,:] : X
 
 ## append right hand side with zeros if necessary
-function _append_zeros(b::AbstractVector, T::Type, n)
-    if n > length(b)
-        x = zeros(T, n)
-        return copy!(x, b)
-    else
-        return copy_oftype(b, T)
-    end
-end
-function _append_zeros(B::AbstractMatrix, T::Type, n)
-    if n > size(B, 1)
-        X = zeros(T, (n, size(B, 2)))
-        X[1:size(B,1), :] = B
-        return X
-    else
-        return copy_oftype(B, T)
-    end
-end
+_zeros(::Type{T}, b::AbstractVector, n::Integer) where {T} = zeros(T, max(length(b), n))
+_zeros(::Type{T}, B::AbstractMatrix, n::Integer) where {T} = zeros(T, max(size(B, 1), n), size(B, 2))
 
 function (\)(A::Union{QR{TA},QRCompactWY{TA},QRPivoted{TA}}, B::AbstractVecOrMat{TB}) where {TA,TB}
     S = promote_type(TA,TB)
@@ -898,7 +839,10 @@ function (\)(A::Union{QR{TA},QRCompactWY{TA},QRPivoted{TA}}, B::AbstractVecOrMat
 
     AA = convert(Factorization{S}, A)
 
-    X = A_ldiv_B!(AA, _append_zeros(B, S, n))
+    X = _zeros(S, B, n)
+    X[1:size(B, 1), :] = B
+
+    A_ldiv_B!(AA, X)
 
     return _cut_B(X, 1:n)
 end
@@ -920,7 +864,10 @@ function (\)(A::Union{QR{T},QRCompactWY{T},QRPivoted{T}}, BIn::VecOrMat{Complex{
 #                                                 |x4|y4|
     B = reshape(transpose(reinterpret(T, reshape(BIn, (1, length(BIn))))), size(BIn, 1), 2*size(BIn, 2))
 
-    X = A_ldiv_B!(A, _append_zeros(B, T, n))
+    X = _zeros(T, B, n)
+    X[1:size(B, 1), :] = B
+
+    A_ldiv_B!(A, X)
 
 # |z1|z3|  reinterpret  |x1|x2|x3|x4|  transpose  |x1|y1|  reshape  |x1|y1|x3|y3|
 # |z2|z4|      <-       |y1|y2|y3|y4|     <-      |x2|y2|     <-    |x2|y2|x4|y4|

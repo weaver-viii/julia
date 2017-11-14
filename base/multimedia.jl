@@ -122,8 +122,8 @@ that binary data is base64-encoded as an ASCII string.
 """
 stringmime(m::MIME, x) = istextmime(m) ? reprmime(m, x) : _binstringmime(m, x)
 
-_binstringmime(m::MIME, x) = base64encode(verbose_show, m, x)
-_binstringmime(m::MIME, x::Vector{UInt8}) = base64encode(write, x)
+_binstringmime(m::MIME, x) = Base64.base64encode(verbose_show, m, x)
+_binstringmime(m::MIME, x::Vector{UInt8}) = Base64.base64encode(write, x)
 
 """
     istextmime(m::MIME)
@@ -262,6 +262,12 @@ Display `x` using the topmost applicable display in the display stack, typically
 richest supported multimedia output for `x`, with plain-text [`STDOUT`](@ref) output as a fallback.
 The `display(d, x)` variant attempts to display `x` on the given display `d` only, throwing
 a [`MethodError`](@ref) if `d` cannot display objects of this type.
+
+In general, you cannot assume that `display` output goes to `STDOUT` (unlike [`print(x)`](@ref) or
+[`show(x)`](@ref)).  For example, `display(x)` may open up a separate window with an image.
+`display(x)` means "show `x` in the best way you can for the current output device(s)."
+If you want REPL-like text output that is guaranteed to go to `STDOUT`, use
+[`show(STDOUT, "text/plain", x)`](@ref) instead.
 
 There are also two variants with a `mime` argument (a MIME type string, such as
 `"image/png"`), which attempt to display `x` using the requested MIME type *only*, throwing

@@ -37,27 +37,20 @@ function choosetests(choices = [])
         "bitarray", "copy", "math", "fastmath", "functional", "iterators",
         "operators", "path", "ccall", "parse", "loading", "bigint",
         "bigfloat", "sorting", "statistics", "spawn", "backtrace",
-        "file", "read", "version", "resolve",
-        "pollfd", "mpfr", "broadcast", "complex", "socket",
+        "file", "read", "version", "resolve", "namedtuple",
+        "mpfr", "broadcast", "complex", "socket",
         "floatapprox", "stdlib", "reflection", "regex", "float16",
         "combinatorics", "sysinfo", "env", "rounding", "ranges", "mod2pi",
         "euler", "show", "lineedit", "replcompletions", "repl",
         "replutil", "sets", "goto", "llvmcall", "llvmcall2", "grisu",
-        "nullable", "meta", "stacktraces", "profile", "libgit2", "docs",
-        "markdown", "base64", "serialize", "misc", "threads",
+        "nullable", "meta", "stacktraces", "libgit2", "docs",
+        "markdown", "serialize", "misc", "threads",
         "enums", "cmdlineargs", "i18n", "workspace", "libdl", "int",
-        "checked", "intset", "floatfuncs", "compile", "distributed", "inline",
+        "checked", "bitset", "floatfuncs", "compile", "distributed", "inline",
         "boundscheck", "error", "ambiguous", "cartesian", "asmvariant", "osutils",
         "channels", "iostream", "specificity", "codegen", "codevalidation",
-        "reinterpretarray"
+        "reinterpretarray", "syntax"
     ]
-    profile_skipped = false
-    if startswith(string(Sys.ARCH), "arm")
-        # Remove profile from default tests on ARM since it currently segfaults
-        # Allow explicitly adding it for testing
-        filter!(x -> (x != "profile"), testnames)
-        profile_skipped = true
-    end
 
     if isdir(joinpath(JULIA_HOME, Base.DOCDIR, "examples"))
         push!(testnames, "examples")
@@ -83,9 +76,6 @@ function choosetests(choices = [])
 
     if tests == ["all"] || isempty(tests)
         tests = testnames
-        if profile_skipped
-            warn("profile test skipped")
-        end
     end
 
     datestests = ["dates/accessors", "dates/adjusters", "dates/query",

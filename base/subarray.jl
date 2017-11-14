@@ -100,7 +100,7 @@ parentindexes(a::AbstractArray) = ntuple(i->OneTo(size(a,i)), ndims(a))
 _maybe_reshape_parent(A::AbstractArray, ::NTuple{1, Bool}) = reshape(A, Val(1))
 _maybe_reshape_parent(A::AbstractArray{<:Any,1}, ::NTuple{1, Bool}) = reshape(A, Val(1))
 _maybe_reshape_parent(A::AbstractArray{<:Any,N}, ::NTuple{N, Bool}) where {N} = A
-_maybe_reshape_parent(A::AbstractArray, ::NTuple{N, Bool}) where {N} = reshape(A, Val(N)) # TODO: DEPRECATE FOR #14770
+_maybe_reshape_parent(A::AbstractArray, ::NTuple{N, Bool}) where {N} = reshape(A, Val(N))
 """
     view(A, inds...)
 
@@ -116,12 +116,12 @@ julia> A = [1 2; 3 4]
  3  4
 
 julia> b = view(A, :, 1)
-2-element SubArray{Int64,1,Array{Int64,2},Tuple{Base.Slice{Base.OneTo{Int64}},Int64},true}:
+2-element view(::Array{Int64,2}, :, 1) with eltype Int64:
  1
  3
 
 julia> fill!(b, 0)
-2-element SubArray{Int64,1,Array{Int64,2},Tuple{Base.Slice{Base.OneTo{Int64}},Int64},true}:
+2-element view(::Array{Int64,2}, :, 1) with eltype Int64:
  0
  0
 
@@ -453,12 +453,12 @@ julia> A = [1 2; 3 4]
  3  4
 
 julia> b = @view A[:, 1]
-2-element SubArray{Int64,1,Array{Int64,2},Tuple{Base.Slice{Base.OneTo{Int64}},Int64},true}:
+2-element view(::Array{Int64,2}, :, 1) with eltype Int64:
  1
  3
 
 julia> fill!(b, 0)
-2-element SubArray{Int64,1,Array{Int64,2},Tuple{Base.Slice{Base.OneTo{Int64}},Int64},true}:
+2-element view(::Array{Int64,2}, :, 1) with eltype Int64:
  0
  0
 

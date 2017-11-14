@@ -7,8 +7,8 @@ struct CapturedException <: Exception
     ex::Any
     processed_bt::Vector{Any}
 
-    function CapturedException(ex, bt_raw::Vector{Ptr{Void}})
-        # bt_raw MUST be an Array of code pointers than can be processed by jl_lookup_code_address
+    function CapturedException(ex, bt_raw::Vector)
+        # bt_raw MUST be a vector that can be processed by StackTraces.stacktrace
         # Typically the result of a catch_backtrace()
 
         # Process bt_raw so that it can be safely serialized
@@ -253,7 +253,20 @@ function task_done_hook(t::Task)
     end
     # Clear sigatomic before waiting
     sigatomic_end()
-    wait() # this will not return
+    try
+        wait() # this will not return
+    catch e
+        # If an InterruptException happens while blocked in the event loop, try handing
+        # the exception to the REPL task since the current task is done.
+        # issue #19467
+        if isa(e,InterruptException) && isdefined(Base,:active_repl_backend) &&
+            active_repl_backend.backend_task.state == :runnable && isempty(Workqueue) &&
+            active_repl_backend.in_eval
+            throwto(active_repl_backend.backend_task, e)
+        else
+            rethrow(e)
+        end
+    end
 end
 
 

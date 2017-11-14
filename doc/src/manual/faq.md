@@ -9,8 +9,8 @@ session (technically, in module `Main`), it is always present.
 
 If memory usage is your concern, you can always replace objects with ones that consume less memory.
  For example, if `A` is a gigabyte-sized array that you no longer need, you can free the memory
-with `A = 0`.  The memory will be released the next time the garbage collector runs; you can force
-this to happen with [`gc()`](@ref).
+with `A = nothing`.  The memory will be released the next time the garbage collector runs; you can force
+this to happen with [`gc()`](@ref). Moreover, an attempt to use `A` will likely result in an error, because most methods are not defined on type `Void`.
 
 ### How can I modify the declaration of a type in my session?
 
@@ -194,6 +194,52 @@ c = 3::Int64
 If Julia were a language that made more liberal use of ASCII characters, the splatting operator
 might have been written as `...->` instead of `...`.
 
+### What is the return value of an assignment?
+
+The operator `=` always returns the right-hand side, therefore:
+
+```jldoctest
+julia> function threeint()
+           x::Int = 3.0
+           x # returns variable x
+       end
+threeint (generic function with 1 method)
+
+julia> function threefloat()
+           x::Int = 3.0 # returns 3.0
+       end
+threefloat (generic function with 1 method)
+
+julia> threeint()
+3
+
+julia> threefloat()
+3.0
+```
+
+and similarly:
+
+```jldoctest
+julia> function threetup()
+           x, y = [3, 3]
+           x, y # returns a tuple
+       end
+threetup (generic function with 1 method)
+
+julia> function threearr()
+           x, y = [3, 3] # returns an array
+       end
+threearr (generic function with 1 method)
+
+julia> threetup()
+(3, 3)
+
+julia> threearr()
+2-element Array{Int64,1}:
+ 3
+ 3
+```
+
 ## Types, type declarations, and constructors
 
 ### [What does "type-stable" mean?](@id man-type-stability)
@@ -228,13 +274,6 @@ ERROR: DomainError with -2.0:
 sqrt will only return a complex result if called with a complex argument. Try sqrt(Complex(x)).
 Stacktrace:
 [...]
-
-julia> 2^-5
-ERROR: DomainError with -5:
-Cannot raise an integer x to a negative power -5.
-Make x a float by adding a zero decimal (e.g., 2.0^-5 instead of 2^-5), or write 1/x^5, float(x)^-5, or (x//1)^-5
-Stacktrace:
-[...]
 ```
 
 This behavior is an inconvenient consequence of the requirement for type-stability.  In the case
@@ -250,9 +289,6 @@ your willingness to accept an *output type* in which the result can be represent
 ```jldoctest
 julia> sqrt(-2.0+0im)
 0.0 + 1.4142135623730951im
-
-julia> 2.0^-5
-0.03125
 ```
 
 ### Why does Julia use native machine integer arithmetic?

@@ -655,6 +655,7 @@ end
 # Simple tests for apropos:
 @test contains(sprint(apropos, "pearson"), "cor")
 @test contains(sprint(apropos, r"ind(exes|ices)"), "eachindex")
+using Profile
 @test contains(sprint(apropos, "print"), "Profile.print")
 
 # Issue #13068.
@@ -923,15 +924,15 @@ let x = Binding(curmod, :bindingdoesnotexist)
 end
 
 let x = Binding(Main, :+)
-    @test parse(string(x)) == :(Base.:+)
+    @test Meta.parse(string(x)) == :(Base.:+)
 end
 
-let x = Binding(Base, :parse)
-    @test parse(string(x)) == :(Base.parse)
+let x = Binding(Meta, :parse)
+    @test Meta.parse(string(x)) == :(Base.Meta.parse)
 end
 
 let x = Binding(Main, :⊕)
-    @test parse(string(x)) == :(⊕)
+    @test Meta.parse(string(x)) == :(⊕)
 end
 
 doc_util_path = Symbol(joinpath("docs", "utils.jl"))
@@ -1066,3 +1067,24 @@ end
 end
 @test Main.f23011() == 2
 @test docstrings_equal(@doc(Main.f23011), doc"second")
+
+# issue 22098
+"an empty macro"
+macro mdoc22098 end
+@test docstrings_equal(@doc(:@mdoc22098), doc"an empty macro")
+
+# issue #24468
+let ex = try
+    include_string(@__MODULE__, """
+
+    \"\"\"
+    an example
+    \"\"\"
+    function hello(param::Vector{In64_nOt_DeFiNeD__})
+    end
+    """)
+catch e
+    e
+end
+    @test ex.line == 2
+end

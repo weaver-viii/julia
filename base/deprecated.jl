@@ -81,8 +81,8 @@ function _depwarn(msg, opts, bt, caller)
     end
 end
 
-firstcaller(bt::Array{Ptr{Void},1}, funcsym::Symbol) = firstcaller(bt, (funcsym,))
-function firstcaller(bt::Array{Ptr{Void},1}, funcsyms)
+firstcaller(bt::Vector, funcsym::Symbol) = firstcaller(bt, (funcsym,))
+function firstcaller(bt::Vector, funcsyms)
     # Identify the calling line
     found = false
     lkup = StackTraces.UNKNOWN
@@ -95,8 +95,8 @@ function firstcaller(bt::Array{Ptr{Void},1}, funcsyms)
             found && @goto found
             found = lkup.func in funcsyms
             # look for constructor type name
-            if !found && !isnull(lkup.linfo)
-                li = get(lkup.linfo)
+            if !found && lkup.linfo != nothing
+                li = lkup.linfo
                 ft = ccall(:jl_first_argument_datatype, Any, (Any,), li.def.sig)
                 if isa(ft,DataType) && ft.name === Type.body.name
                     ft = unwrap_unionall(ft.parameters[1])
@@ -151,7 +151,7 @@ const _oldstyle_array_vcat_ = false
 
 @deprecate write(x) write(STDOUT::IO, x)
 
-function delete!(::EnvHash, k::AbstractString, def)
+function delete!(::EnvDict, k::AbstractString, def)
     depwarn("`delete!(ENV, k, def)` should be replaced with `pop!(ENV, k, def)`. Be aware that `pop!` returns `k` or `def`, while `delete!` returns `ENV` or `def`.", :delete!)
     haskey(ENV,k) ? delete!(ENV,k) : def
 end
@@ -218,15 +218,9 @@ end
 @deprecate SubArray(parent::AbstractArray, indexes::Tuple, dims::Tuple) SubArray(parent, indexes)
 
 # Deprecate vectorized unary functions over sparse matrices in favor of compact broadcast syntax (#17265).
-for f in (:sin, :sinh, :sind, :asin, :asinh, :asind,
-        :tan, :tanh, :tand, :atan, :atanh, :atand,
-        :sinpi, :cosc, :ceil, :floor, :trunc, :round,
-        :log1p, :expm1, :abs, :abs2,
-        :log2, :log10, :exp2, :exp10, :sinc, :cospi,
-        :cos, :cosh, :cosd, :acos, :acosd,
-        :cot, :coth, :cotd, :acot, :acotd,
-        :sec, :sech, :secd, :asech,
-        :csc, :csch, :cscd, :acsch)
+for f in (:sind, :asind, :tand, :atand, :sinpi, :cosc, :ceil, :floor, :trunc,
+        :round, :log1p, :expm1, :abs, :abs2, :log2, :log10, :exp2, :exp10,
+        :sinc, :cospi, :cosd, :acosd, :cotd, :acotd, :secd, :cscd)
     @eval import .Math: $f
     @eval @deprecate $f(A::SparseMatrixCSC) $f.(A)
 end
@@ -254,9 +248,7 @@ for f in (
         # base/special/gamma.jl
         :gamma, :lfact,
         # base/math.jl
-        :cbrt, :sinh, :cosh, :tanh, :atan, :asinh, :exp2,
-        :expm1, :exp10, :sin, :cos, :tan, :asin, :acos, :acosh, :atanh,
-        :log2, :log10, :lgamma, #=:log1p,=#
+        :cbrt, :exp2, :expm1, :exp10, :log2, :log10, :lgamma, #=:log1p,=#
         # base/floatfuncs.jl
         :abs, :abs2, :angle, :isnan, :isinf, :isfinite,
         # base/complex.jl
@@ -481,8 +473,6 @@ end
 @deprecate den denominator
 @deprecate num numerator
 
-Filesystem.stop_watching(stream::Filesystem._FDWatcher) = depwarn("stop_watching(::_FDWatcher) should not be used", :stop_watching)
-
 # #19088
 @deprecate takebuf_array take!
 @deprecate takebuf_string(b) String(take!(b))
@@ -700,17 +690,6 @@ end
 @deprecate xor(A::AbstractArray, b::Number)         xor.(A, b)
 @deprecate xor(A::AbstractArray, B::AbstractArray)  xor.(A, B)
 
-# QuadGK moved to a package (#19741)
-@deprecate_moved quadgk "QuadGK"
-
-# Collections functions moved to a package (#19800)
-module Collections
-    for f in (:PriorityQueue, :enqueue!, :dequeue!, :heapify!, :heapify, :heappop!, :heappush!, :isheap, :peek)
-        @eval Base.@deprecate_moved $f "DataStructures"
-    end
-end
-export Collections
-
 # Broadcast now returns a BitArray when the resulting eltype is Bool (#17623)
 @deprecate bitbroadcast broadcast
 
@@ -742,9 +721,7 @@ end
 @deprecate sign(A::AbstractArray) sign.(A)
 
 # Deprecate manually vectorized trigonometric and hyperbolic functions in favor of compact broadcast syntax
-for f in (:sec, :sech, :secd, :asec, :asech,
-            :csc, :csch, :cscd, :acsc, :acsch,
-            :cot, :coth, :cotd, :acot, :acoth)
+for f in (:secd, :cscd, :cotd)
     @eval import .Math: $f
     @eval @deprecate $f(A::AbstractArray{<:Number}) $f.(A)
 end
@@ -1264,9 +1241,10 @@ _current_module() = ccall(:jl_get_current_module, Ref{Module}, ())
     depwarn("binding_module(symbol) is deprecated, use `binding_module(module, symbol)` instead.", :binding_module)
     return binding_module(_current_module(), s)
 end
+export expand
 @noinline function expand(@nospecialize(x))
-    depwarn("expand(x) is deprecated, use `expand(module, x)` instead.", :expand)
-    return expand(_current_module(), x)
+    depwarn("expand(x) is deprecated, use `Meta.lower(module, x)` instead.", :expand)
+    return Meta.lower(_current_module(), x)
 end
 @noinline function macroexpand(@nospecialize(x))
     depwarn("macroexpand(x) is deprecated, use `macroexpand(module, x)` instead.", :macroexpand)
@@ -1342,6 +1320,7 @@ module DFT
             @eval Base.@deprecate_moved $f "FFTW"
         end
     end
+    Base.deprecate(DFT, :FFTW, 2)
     export FFTW
 end
 using .DFT
@@ -1353,6 +1332,7 @@ module DSP
         @eval Base.@deprecate_moved $f "DSP"
     end
 end
+deprecate(Base, :DSP, 2)
 using .DSP
 export conv, conv2, deconv, filt, filt!, xcorr
 
@@ -1361,6 +1341,22 @@ export conv, conv2, deconv, filt, filt!, xcorr
 @deprecate_moved SharedArray "SharedArrays" true true
 
 @deprecate_binding Mmap nothing true ", run `using Mmap` instead"
+
+@deprecate_binding Profile nothing true ", run `using Profile` instead"
+@eval @deprecate_moved $(Symbol("@profile")) "Profile" true true
+
+@deprecate_moved base64encode "Base64" true true
+@deprecate_moved base64decode "Base64" true true
+@deprecate_moved Base64EncodePipe "Base64" true true
+@deprecate_moved Base64DecodePipe "Base64" true true
+
+@deprecate_moved poll_fd "FileWatching" true true
+@deprecate_moved poll_file "FileWatching" true true
+@deprecate_moved PollingFileWatcher "FileWatching" true true
+@deprecate_moved watch_file "FileWatching" true true
+@deprecate_moved FileMonitor "FileWatching" true true
+
+@deprecate_moved crc32c "CRC32c" true true
 
 # PR #21709
 @deprecate cov(x::AbstractVector, corrected::Bool) cov(x, corrected=corrected)
@@ -1480,10 +1476,11 @@ for op in (:floor, :ceil, :trunc, :round,
 end
 # deprecate remaining vectorized methods over SparseVectors (not-zero-preserving)
 for op in (:exp, :exp2, :exp10, :log, :log2, :log10,
-        :cos, :cosd, :acos, :cosh, :cospi,
-        :csc, :cscd, :acot, :csch, :acsch,
-        :cot, :cotd, :acosd, :coth,
-        :sec, :secd, :acotd, :sech, :asech)
+           :cos, :cosd, :acos, :cosh, :cospi,
+           :csc, :cscd, :acot, :csch, :acsch,
+           :cot, :cotd, :acosd, :coth,
+           :sec, :secd, :acotd, :sech, :asech)
+    @eval import .Math: $op
     @eval @deprecate ($op)(x::AbstractSparseVector{<:Number,<:Integer}) ($op).(x)
 end
 
@@ -1638,10 +1635,10 @@ export hex2num
 
 # PR 23341
 import .LinAlg: diagm
-@deprecate diagm(A::SparseMatrixCSC) spdiagm(sparsevec(A))
+@deprecate diagm(A::SparseMatrixCSC) sparse(Diagonal(sparsevec(A)))
 
 # PR #23373
-@deprecate diagm(A::BitMatrix) diagm(vec(A))
+@deprecate diagm(A::BitMatrix) BitMatrix(Diagonal(vec(A)))
 
 # PR 23341
 @eval GMP @deprecate gmp_version() version() false
@@ -1698,6 +1695,8 @@ end
 @deprecate select! partialsort!
 @deprecate selectperm partialsortperm
 @deprecate selectperm! partialsortperm!
+
+# `initialized` keyword arg to `sort` is deprecated in sort.jl
 
 @deprecate promote_noncircular promote false
 
@@ -1757,6 +1756,33 @@ end
 
 @deprecate contains(eq::Function, itr, x) any(y->eq(y,x), itr)
 
+# PR #23757
+import .SparseArrays.spdiagm
+@deprecate spdiagm(x::AbstractVector) sparse(Diagonal(x))
+function spdiagm(x::AbstractVector, d::Number)
+    depwarn(string("spdiagm(x::AbstractVector, d::Number) is deprecated, use ",
+        "spdiagm(d => x) instead, which now returns a square matrix. To preserve the old ",
+        "behaviour, use sparse(SparseArrays.spdiagm_internal(d => x)...)"), :spdiagm)
+    I, J, V = SparseArrays.spdiagm_internal(d => x)
+    return sparse(I, J, V)
+end
+function spdiagm(x, d)
+    depwarn(string("spdiagm((x1, x2, ...), (d1, d2, ...)) is deprecated, use ",
+        "spdiagm(d1 => x1, d2 => x2, ...) instead, which now returns a square matrix. ",
+        "To preserve the old behaviour, use ",
+        "sparse(SparseArrays.spdiagm_internal(d1 => x1, d2 => x2, ...)...)"), :spdiagm)
+    I, J, V = SparseArrays.spdiagm_internal((d[i] => x[i] for i in 1:length(x))...)
+    return sparse(I, J, V)
+end
+function spdiagm(x, d, m::Integer, n::Integer)
+    depwarn(string("spdiagm((x1, x2, ...), (d1, d2, ...), m, n) is deprecated, use ",
+        "spdiagm(d1 => x1, d2 => x2, ...) instead, which now returns a square matrix. ",
+        "To specify a non-square matrix and preserve the old behaviour, use ",
+        "I, J, V = SparseArrays.spdiagm_internal(d1 => x1, d2 => x2, ...); sparse(I, J, V, m, n)"), :spdiagm)
+    I, J, V = SparseArrays.spdiagm_internal((d[i] => x[i] for i in 1:length(x))...)
+    return sparse(I, J, V, m, n)
+end
+
 # PR #23690
 # `SSHCredentials` and `UserPasswordCredentials` constructors using `prompt_if_incorrect`
 # are deprecated in base/libgit2/types.jl.
@@ -1765,6 +1791,8 @@ end
 @eval LibGit2 begin
     @deprecate get_creds!(cache::CachedCredentials, credid, default) get!(cache, credid, default)
 end
+
+@deprecate eye(::Type{Diagonal{T}}, n::Int) where {T} Diagonal{T}(I, n)
 
 export tic, toq, toc
 function tic()
@@ -1796,6 +1824,14 @@ function toc()
     println("elapsed time: ", t, " seconds")
     return t
 end
+
+# A[I...] .= with scalar indices should modify the element at A[I...]
+function Broadcast.dotview(A::AbstractArray, args::Number...)
+    depwarn("the behavior of `A[I...] .= X` with scalar indices will change in the future. Use `A[I...] = X` instead.", :broadcast!)
+    view(A, args...)
+end
+Broadcast.dotview(A::AbstractArray{<:AbstractArray}, args::Integer...) = getindex(A, args...)
+# Upon removing deprecations, also enable the @testset "scalar .=" in test/broadcast.jl
 
 # PR #23816: deprecation of gradient
 export gradient
@@ -1843,9 +1879,175 @@ end
     nothing
 end
 
+# indexing with A[true] will throw an argument error in the future
+function to_index(i::Bool)
+    depwarn("indexing with Bool values is deprecated. Convert the index to an integer first with `Int(i)`.", (:getindex, :setindex!, :view))
+    convert(Int,i)::Int
+end
+# After deprecation is removed, enable the @testset "indexing by Bool values" in test/arrayops.jl
+# Also un-comment the new definition in base/indices.jl
+
+# deprecate odd fill! methods
+@deprecate fill!(D::Diagonal, x)                       fillslots!(D, x)
+@deprecate fill!(A::Base.LinAlg.AbstractTriangular, x) fillslots!(A, x)
+
+function diagm(v::BitVector)
+    depwarn(string("diagm(v::BitVector) is deprecated, use diagm(0 => v) or ",
+        "BitMatrix(Diagonal(v)) instead"), :diagm)
+    return BitMatrix(Diagonal(v))
+end
+function diagm(v::AbstractVector)
+    depwarn(string("diagm(v::AbstractVector) is deprecated, use diagm(0 => v) or ",
+        "Matrix(Diagonal(v)) instead"), :diagm)
+    return Matrix(Diagonal(v))
+end
+@deprecate diagm(v::AbstractVector, k::Integer) diagm(k => v)
+@deprecate diagm(x::Number) fill(x, 1, 1)
+
+## deprecate full
+export full
+# full no-op fallback
+function full(A::AbstractArray)
+    depwarn(string(
+        "The no-op `full(A::AbstractArray)` fallback has been deprecated, and no more ",
+        "specific `full` method for $(typeof(A)) exists. Furthermore, `full` in general ",
+        "has been deprecated.\n\n",
+        "To replace `full(A)`, as appropriate consider dismabiguating with a concrete ",
+        "array constructor (e.g. `Array(A)`), with an abstract array constructor (e.g.`AbstractArray(A)`), ",
+        "instead `convert`ing to an array type (e.g `convert(Array, A)`, `convert(AbstractArray, A)`), ",
+        "or using another such operation that addresses your specific use case."),  :full)
+    return A
+end
+
+# full for structured arrays
+function full(A::Union{Diagonal,Bidiagonal,Tridiagonal,SymTridiagonal})
+    mattypestr = isa(A, Diagonal)        ? "Diagonal"        :
+                 isa(A, Bidiagonal)      ? "Bidiagonal"      :
+                 isa(A, Tridiagonal)     ? "Tridiagonal"     :
+                 isa(A, SymTridiagonal)  ? "SymTridiagonal"  :
+                    error("should not be reachable!")
+    depwarn(string(
+        "`full(A::$(mattypestr))` (and `full` in general) has been deprecated. ",
+        "To replace `full(A::$(mattypestr))`, consider `Matrix(A)` or, if that ",
+        "option is too narrow, `Array(A)`. Also consider `SparseMatrixCSC(A)` ",
+        "or, if that option is too narrow, `sparse(A)`."),  :full)
+    return Matrix(A)
+end
+
+# full for sparse arrays
+function full(S::Union{SparseVector,SparseMatrixCSC})
+    (arrtypestr, desttypestr) =
+        isa(S, SparseVector)    ? ("SparseVector",    "Vector") :
+        isa(S, SparseMatrixCSC) ? ("SparseMatrixCSC", "Matrix") :
+            error("should not be reachable!")
+    depwarn(string(
+        "`full(S::$(arrtypestr))` (and `full` in general) has been deprecated. ",
+        "To replace `full(S::$(arrtypestr))`, consider `$(desttypestr)(S)` or, ",
+        "if that option is too narrow, `Array(S)`."), :full)
+    return Array(S)
+end
+
+# full for factorizations
+function full(F::Union{LinAlg.LU,LinAlg.LQ,LinAlg.QR,LinAlg.QRPivoted,LinAlg.QRCompactWY,
+                        LinAlg.SVD,LinAlg.LDLt,LinAlg.Schur,LinAlg.Eigen,LinAlg.Hessenberg,
+                        LinAlg.Cholesky,LinAlg.CholeskyPivoted})
+    facttypestr = isa(F, LinAlg.LU)               ? "LU"              :
+                  isa(F, LinAlg.LQ)               ? "LQ"              :
+                  isa(F, LinAlg.QR)               ? "QR"              :
+                  isa(F, LinAlg.QRPivoted)        ? "QRPivoted"       :
+                  isa(F, LinAlg.QRCompactWY)      ? "QRCompactWY"     :
+                  isa(F, LinAlg.SVD)              ? "SVD"             :
+                  isa(F, LinAlg.LDLt)             ? "LDLt"            :
+                  isa(F, LinAlg.Schur)            ? "Schur"           :
+                  isa(F, LinAlg.Eigen)            ? "Eigen"           :
+                  isa(F, LinAlg.Hessenberg)       ? "Hessenberg"      :
+                  isa(F, LinAlg.Cholesky)         ? "Cholesky"        :
+                  isa(F, LinAlg.CholeskyPivoted)  ? "CholeskyPivoted" :
+                      error("should not be reachable!")
+   depwarn(string(
+       "`full(F::$(facttypestr))` (and `full` in general) has been deprecated. ",
+       "To replace `full(F::$(facttypestr))`, consider `Matrix(F)`, `AbstractMatrix(F)` or, ",
+       "if those options are too narrow, `Array(F)` or `AbstractArray(F)`."), :full)
+   return AbstractMatrix(F)
+end
+
+# full for implicit orthogonal factors
+function full(Q::LinAlg.HessenbergQ)
+    depwarn(string(
+        "`full(Q::HessenbergQ)` (and `full` in general) has been deprecated. ",
+        "To replace `full(Q::HessenbergQ)`, consider `Matrix(Q)` or, ",
+        "if that option is too narrow, `Array(Q)`."), :full)
+    return Matrix(Q)
+end
+function full(Q::LinAlg.LQPackedQ; thin::Bool = true)
+    depwarn(string(
+        "`full(Q::LQPackedQ; thin::Bool = true)` (and `full` in general) ",
+        "has been deprecated. To replace `full(Q::LQPackedQ, true)`, ",
+        "consider `Matrix(Q)` or `Array(Q)`. To replace `full(Q::LQPackedQ, false)`, ",
+        "consider `Base.LinAlg.A_mul_B!(Q, eye(eltype(Q), size(Q.factors, 2)))`."), :full)
+    return thin ? Array(Q) : A_mul_B!(Q, eye(eltype(Q), size(Q.factors, 2)))
+end
+function full(Q::Union{LinAlg.QRPackedQ,LinAlg.QRCompactWYQ}; thin::Bool = true)
+    qtypestr = isa(Q, LinAlg.QRPackedQ)    ? "QRPackedQ"    :
+               isa(Q, LinAlg.QRCompactWYQ) ? "QRCompactWYQ" :
+                  error("should not be reachable!")
+    depwarn(string(
+        "`full(Q::$(qtypestr); thin::Bool = true)` (and `full` in general) ",
+        "has been deprecated. To replace `full(Q::$(qtypestr), true)`, ",
+        "consider `Matrix(Q)` or `Array(Q)`. To replace `full(Q::$(qtypestr), false)`, ",
+        "consider `Base.LinAlg.A_mul_B!(Q, eye(eltype(Q), size(Q.factors, 1)))`."), :full)
+    return thin ? Array(Q) : A_mul_B!(Q, eye(eltype(Q), size(Q.factors, 1)))
+end
+
+# full for symmetric / hermitian / triangular wrappers
+function full(A::Symmetric)
+    depwarn(string(
+        "`full(A::Symmetric)` (and `full` in general) has been deprecated. ",
+        "To replace `full(A::Symmetric)`, as appropriate consider `Matrix(A)`, ",
+        "`Array(A)`, `SparseMatrixCSC(A)`, `sparse(A)`, `copy!(similar(parent(A)), A)`, ",
+        "or `Base.LinAlg.copytri!(copy(parent(A)), A.uplo)`."), :full)
+    return Matrix(A)
+end
+function full(A::Hermitian)
+    depwarn(string(
+        "`full(A::Hermitian)` (and `full` in general) has been deprecated. ",
+        "To replace `full(A::Hermitian)`, as appropriate consider `Matrix(A)`, ",
+        "`Array(A)`, `SparseMatrixCSC(A)`, `sparse(A)`, `copy!(similar(parent(A)), A)`, ",
+        "or `Base.LinAlg.copytri!(copy(parent(A)), A.uplo, true)`."), :full)
+    return Matrix(A)
+end
+function full(A::Union{UpperTriangular,LowerTriangular})
+    (tritypestr, tri!str) =
+        isa(A, UpperTriangular) ? ("UpperTriangular", "triu!") :
+        isa(A, LowerTriangular) ? ("LowerTriangular", "tril!") :
+            error("should not be reachable!")
+    depwarn(string(
+        "`full(A::$(tritypestr))` (and `full` in general) has been deprecated. ",
+        "To replace `full(A::$(tritypestr))`, as appropriate consider `Matrix(A)`, ",
+        "`Array(A)`, `SparseMatrixCSC(A)`, `sparse(A)`, `copy!(similar(parent(A)), A)`, ",
+        "or `$(tri!str)(copy(parent(A)))`."), :full)
+    return Matrix(A)
+end
+function full(A::Union{LinAlg.UnitUpperTriangular,LinAlg.UnitLowerTriangular})
+    tritypestr = isa(A, LinAlg.UnitUpperTriangular) ? "LinAlg.UnitUpperTriangular" :
+                 isa(A, LinAlg.UnitLowerTriangular) ? "LinAlg.UnitLowerTriangular" :
+                     error("should not be reachable!")
+    depwarn(string(
+        "`full(A::$(tritypestr))` (and `full` in general) has been deprecated. ",
+        "To replace `full(A::$(tritypestr))`, as appropriate consider `Matrix(A)`, ",
+        "`Array(A)`, `SparseMatrixCSC(A)`, `sparse(A)`, or `copy!(similar(parent(A)), A)`."), :full)
+    return Matrix(A)
+end
+
+
 # issue #20816
 @deprecate strwidth textwidth
 @deprecate charwidth textwidth
+
+# TODO: after 0.7, remove thin keyword argument and associated logic from...
+# (1) base/linalg/svd.jl
+# (2) base/linalg/qr.jl
+# (3) base/linalg/lq.jl
 
 @deprecate find(x::Number)            find(!iszero, x)
 @deprecate findnext(A, v, i::Integer) findnext(equalto(v), A, i)
@@ -1858,6 +2060,42 @@ end
 # issue #22849
 @deprecate reinterpret(::Type{T}, a::Array{S}, dims::NTuple{N,Int}) where {T, S, N} reshape(reinterpret(T, vec(a)), dims)
 @deprecate reinterpret(::Type{T}, a::SparseMatrixCSC{S}, dims::NTuple{N,Int}) where {T, S, N} reinterpret(T, reshape(a, dims))
+
+# issue #24006
+@deprecate linearindices(s::AbstractString) eachindex(s)
+
+# deprecate IntSet to BitSet
+@deprecate_binding IntSet BitSet
+
+# Issue 24219
+@deprecate float(x::AbstractString) parse(Float64, x)
+@deprecate float(a::AbstractArray{<:AbstractString}) parse.(Float64, a)
+
+# deprecate bits to bitstring (#24263, #24281)
+@deprecate bits bitstring
+
+# issue #24167
+@deprecate EnvHash EnvDict
+
+# issue #24349
+@deprecate parse(str::AbstractString; kwargs...) Meta.parse(str; kwargs...)
+@deprecate parse(str::AbstractString, pos::Int, ; kwargs...) Meta.parse(str, pos; kwargs...)
+@deprecate_binding ParseError Meta.ParseError
+
+# #24258
+# Physical units define an equivalence class: there is no such thing as a step of "1" (is
+# it one day or one second or one nanosecond?). So require the user to specify the step
+# (in physical units).
+@deprecate colon(start::T, stop::T) where {T<:DateTime}   start:Dates.Day(1):stop
+@deprecate colon(start::T, stop::T) where {T<:Date}       start:Dates.Day(1):stop
+@deprecate colon(start::T, stop::T) where {T<:Dates.Time} start:Dates.Second(1):stop
+
+@deprecate range(start::DateTime, len::Integer)  range(start, Dates.Day(1), len)
+@deprecate range(start::Date, len::Integer)      range(start, Dates.Day(1), len)
+
+@eval LinAlg begin
+    @deprecate chol!(x::Number, uplo) chol(x) false
+end
 
 # END 0.7 deprecations
 

@@ -184,6 +184,16 @@ function authenticate_userpass(libgit2credptr::Ptr{Ptr{Void}}, p::CredentialPayl
         cred.pass = ""
     end
 
+    if p.use_git_helpers && (!revised || !isfilled(cred))
+        git_cred = GitCredential(p.config, p.url)
+
+        cred.user = Base.get(git_cred.username, "")
+        cred.pass = Base.get(git_cred.password, "")
+        revised = true
+
+        p.use_git_helpers = false
+    end
+
     if p.remaining_prompts > 0 && (!revised || !isfilled(cred))
         url = git_url(scheme=p.scheme, host=p.host)
         username = isempty(cred.user) ? p.username : cred.user
@@ -254,7 +264,7 @@ function credentials_callback(libgit2credptr::Ptr{Ptr{Void}}, url_ptr::Cstring,
 
     # get `CredentialPayload` object from payload pointer
     @assert payload_ptr != C_NULL
-    p = unsafe_pointer_to_objref(payload_ptr)[]::CredentialPayload
+    p = unsafe_pointer_to_objref(payload_ptr)::CredentialPayload
 
     # Parse URL only during the first call to this function. Future calls will use the
     # information cached inside the payload.

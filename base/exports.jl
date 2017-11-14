@@ -6,7 +6,6 @@ export
     Pkg,
     LibGit2,
     StackTraces,
-    Profile,
     Dates,
     Sys,
     Libc,
@@ -23,6 +22,7 @@ export
 
 # Types
     AbstractChannel,
+    AbstractIrrational,
     AbstractMatrix,
     AbstractRange,
     AbstractSet,
@@ -62,14 +62,13 @@ export
     Enumerate,
     ExponentialBackOff,
     Factorization,
-    FileMonitor,
     Hermitian,
     UniformScaling,
     IndexCartesian,
     IndexLinear,
     IndexStyle,
     InsertionSort,
-    IntSet,
+    BitSet,
     IOBuffer,
     IOStream,
     LinSpace,
@@ -84,7 +83,6 @@ export
     Pair,
     PartialQuickSort,
     PermutedDimsArray,
-    PollingFileWatcher,
     QuickSort,
     RangeIndex,
     Rational,
@@ -623,7 +621,6 @@ export
     ×,
 
 # sparse
-    full,
     dropzeros,
     dropzeros!,
 
@@ -716,13 +713,9 @@ export
 # strings and text output
     ascii,
     base,
-    base64encode,
-    base64decode,
-    Base64EncodePipe,
-    Base64DecodePipe,
     startswith,
     bin,
-    bits,
+    bitstring,
     bytes2hex,
     chomp,
     chop,
@@ -936,7 +929,6 @@ export
 
 # syntax
     esc,
-    expand,
     gensym,
     macroexpand,
     @macroexpand1,
@@ -986,7 +978,6 @@ export
     atexit,
     atreplinit,
     clipboard,
-    crc32c,
     exit,
     ntuple,
     quit,
@@ -1033,8 +1024,6 @@ export
     pipeline,
     Pipe,
     PipeBuffer,
-    poll_fd,
-    poll_file,
     position,
     RawFD,
     read,
@@ -1062,7 +1051,6 @@ export
     take!,
     truncate,
     unmark,
-    watch_file,
     write,
     TCPSocket,
     UDPSocket,
@@ -1212,7 +1200,6 @@ export
     @timev,
     @elapsed,
     @allocated,
-    @profile,
 
     # reflection
     @which,

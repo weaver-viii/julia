@@ -4,10 +4,11 @@ baremodule Base
 
 using Core.Intrinsics
 ccall(:jl_set_istopmod, Void, (Any, Bool), Base, true)
+
 function include(mod::Module, path::AbstractString)
     local result
     if INCLUDE_STATE === 1
-        result = Core.include(mod, path)
+        result = _include1(mod, path)
     elseif INCLUDE_STATE === 2
         result = _include(mod, path)
     elseif INCLUDE_STATE === 3
@@ -18,7 +19,7 @@ end
 function include(path::AbstractString)
     local result
     if INCLUDE_STATE === 1
-        result = Core.include(Base, path)
+        result = _include1(Base, path)
     elseif INCLUDE_STATE === 2
         result = _include(Base, path)
     else
@@ -28,12 +29,18 @@ function include(path::AbstractString)
     end
     result
 end
+const _included_files = Array{Tuple{Module,String}}(0)
+function _include1(mod::Module, path)
+    Core.Inference.push!(_included_files, (mod, ccall(:jl_prepend_cwd, Any, (Any,), path)))
+    Core.include(mod, path)
+end
 let SOURCE_PATH = ""
     # simple, race-y TLS, relative include
     global _include
     function _include(mod::Module, path)
         prev = SOURCE_PATH
         path = joinpath(dirname(prev), path)
+        push!(_included_files, (mod, abspath(path)))
         SOURCE_PATH = path
         result = Core.include(mod, path)
         SOURCE_PATH = prev
@@ -135,6 +142,10 @@ Vector(m::Integer) = Array{Any,1}(Int(m))
 Matrix{T}(m::Integer, n::Integer) where {T} = Matrix{T}(Int(m), Int(n))
 Matrix(m::Integer, n::Integer) = Matrix{Any}(Int(m), Int(n))
 
+include("associative.jl")
+
+include("namedtuple.jl")
+
 # numeric operations
 include("hashing.jl")
 include("rounding.jl")
@@ -167,8 +178,7 @@ include("reduce.jl")
 ## core structures
 include("reshapedarray.jl")
 include("bitarray.jl")
-include("intset.jl")
-include("associative.jl")
+include("bitset.jl")
 
 if !isdefined(Core, :Inference)
     include("docs/core.jl")
@@ -229,27 +239,29 @@ include("broadcast.jl")
 using .Broadcast
 
 # define the real ntuple functions
-@generated function ntuple(f::F, ::Val{N}) where {F,N}
-    Core.typeassert(N, Int)
-    (N >= 0) || return :(throw($(ArgumentError(string("tuple length should be ≥0, got ", N)))))
-    return quote
-        $(Expr(:meta, :inline))
-        @nexprs $N i -> t_i = f(i)
-        @ncall $N tuple t
+@inline function ntuple(f::F, ::Val{N}) where {F,N}
+    N::Int
+    (N >= 0) || throw(ArgumentError(string("tuple length should be ≥0, got ", N)))
+    if @generated
+        quote
+            @nexprs $N i -> t_i = f(i)
+            @ncall $N tuple t
+        end
+    else
+        Tuple(f(i) for i = 1:N)
     end
 end
-@generated function fill_to_length(t::Tuple, val, ::Val{N}) where {N}
-    M = length(t.parameters)
-    M > N  && return :(throw($(ArgumentError("input tuple of length $M, requested $N"))))
-    return quote
-        $(Expr(:meta, :inline))
-        (t..., $(Any[ :val for i = (M + 1):N ]...))
+@inline function fill_to_length(t::Tuple, val, ::Val{N}) where {N}
+    M = length(t)
+    M > N && throw(ArgumentError("input tuple of length $M, requested $N"))
+    if @generated
+        quote
+            (t..., $(fill(:val, N-length(t.parameters))...))
+        end
+    else
+        (t..., fill(val, N-M)...)
     end
 end
-
-# base64 conversions (need broadcast)
-include("base64.jl")
-using .Base64
 
 # version
 include("version.jl")
@@ -276,8 +288,6 @@ include("socket.jl")
 include("filesystem.jl")
 using .Filesystem
 include("process.jl")
-include("multimedia.jl")
-using .Multimedia
 include("grisu/grisu.jl")
 import .Grisu.print_shortest
 include("methodshow.jl")
@@ -365,17 +375,12 @@ include("replutil.jl")
 include("i18n.jl")
 using .I18n
 
-# frontend
-include("initdefs.jl")
-include("repl/Terminals.jl")
-include("repl/LineEdit.jl")
-include("repl/REPLCompletions.jl")
-include("repl/REPL.jl")
-include("client.jl")
-
 # Stack frames and traces
 include("stacktraces.jl")
 using .StackTraces
+
+include("initdefs.jl")
+include("client.jl")
 
 # misc useful functions & macros
 include("util.jl")
@@ -395,10 +400,6 @@ include("libgit2/libgit2.jl")
 # package manager
 include("pkg/pkg.jl")
 
-# profiler
-include("profile.jl")
-using .Profile
-
 # dates
 include("dates/Dates.jl")
 import .Dates: Date, DateTime, DateFormat, @dateformat_str, now
@@ -412,11 +413,29 @@ include("asyncmap.jl")
 include("distributed/Distributed.jl")
 using .Distributed
 
+# worker threads
+include("threadcall.jl")
+
 # code loading
 include("loading.jl")
 
-# worker threads
-include("threadcall.jl")
+# set up load path to be able to find stdlib packages
+init_load_path(ccall(:jl_get_julia_home, Any, ()))
+
+INCLUDE_STATE = 3 # include = include_relative
+
+import Base64
+
+INCLUDE_STATE = 2
+
+include("multimedia.jl")
+using .Multimedia
+
+# frontend
+include("repl/Terminals.jl")
+include("repl/LineEdit.jl")
+include("repl/REPLCompletions.jl")
+include("repl/REPL.jl")
 
 # deprecated functions
 include("deprecated.jl")
@@ -440,15 +459,16 @@ function __init__()
     init_threadcall()
 end
 
+include("precompile.jl")
+
 INCLUDE_STATE = 3 # include = include_relative
-include(Base, "precompile.jl")
 
 end # baremodule Base
 
 using Base
 
-# set up load path to be able to find stdlib packages
-Base.init_load_path(ccall(:jl_get_julia_home, Any, ()))
+# Ensure this file is also tracked
+unshift!(Base._included_files, (@__MODULE__, joinpath(@__DIR__, "sysimg.jl")))
 
 # load some stdlib packages but don't put their names in Main
 Base.require(:DelimitedFiles)

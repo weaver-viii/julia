@@ -4,7 +4,6 @@
 
 endof(s::AbstractString) = error("you must implement endof(", typeof(s), ")")
 next(s::AbstractString, i::Int) = error("you must implement next(", typeof(s), ",Int)")
-next(s::DirectIndexString, i::Int) = (s[i],i+1)
 next(s::AbstractString, i::Integer) = next(s,Int(i))
 
 string() = ""
@@ -69,8 +68,6 @@ julia> 'j' * "ulia"
 (*)(s1::Union{Char, AbstractString}, ss::Union{Char, AbstractString}...) = string(s1, ss...)
 
 one(::Union{T,Type{T}}) where {T<:AbstractString} = convert(T, "")
-
-length(s::DirectIndexString) = endof(s)
 
 """
     length(s::AbstractString)
@@ -198,8 +195,6 @@ isless(a::Symbol, b::Symbol) = cmp(a,b) < 0
 
 ## Generic validation functions ##
 
-isvalid(s::DirectIndexString, i::Integer) = (start(s) <= i <= endof(s))
-
 """
     isvalid(str::AbstractString, i::Integer)
 
@@ -236,20 +231,6 @@ function isvalid(s::AbstractString, i::Integer)
 end
 
 ## Generic indexing functions ##
-
-prevind(s::DirectIndexString, i::Integer) = Int(i)-1
-nextind(s::DirectIndexString, i::Integer) = Int(i)+1
-
-function prevind(s::DirectIndexString, i::Integer, nchar::Integer)
-    nchar > 0 || throw(ArgumentError("nchar must be greater than 0"))
-    Int(i)-nchar
-end
-
-function nextind(s::DirectIndexString, i::Integer, nchar::Integer)
-    nchar > 0 || throw(ArgumentError("nchar must be greater than 0"))
-    Int(i)+nchar
-end
-
 
 """
     prevind(str::AbstractString, i::Integer, nchar::Integer=1)
@@ -370,9 +351,6 @@ checkbounds(s::AbstractString, r::AbstractRange{<:Integer}) = isempty(r) || (min
 # The following will end up using a deprecated checkbounds, when the covariant parameter is not Integer
 checkbounds(s::AbstractString, I::AbstractArray{<:Real}) = all(i -> checkbounds(s, i), I)
 checkbounds(s::AbstractString, I::AbstractArray{<:Integer}) = all(i -> checkbounds(s, i), I)
-
-ind2chr(s::DirectIndexString, i::Integer) = begin checkbounds(s,i); i end
-chr2ind(s::DirectIndexString, i::Integer) = begin checkbounds(s,i); i end
 
 
 """
@@ -611,3 +589,60 @@ function filter(f, s::AbstractString)
     end
     String(take!(out))
 end
+
+## string first and last ##
+
+"""
+    first(str::AbstractString, nchar::Integer)
+
+Get a string consisting of the first `nchar` characters of `str`.
+
+```jldoctest
+julia> first("∀ϵ≠0: ϵ²>0", 0)
+""
+
+julia> first("∀ϵ≠0: ϵ²>0", 1)
+"∀"
+
+julia> first("∀ϵ≠0: ϵ²>0", 3)
+"∀ϵ≠"
+```
+"""
+function first(str::AbstractString, nchar::Integer)
+    if 0 <= nchar <= 1
+        return str[1:nchar]
+    end
+    str[1:nextind(str, 1, nchar-1)]
+end
+
+"""
+    last(str::AbstractString, nchar::Integer)
+
+Get a string consisting of the last `nchar` characters of `str`.
+
+```jldoctest
+julia> last("∀ϵ≠0: ϵ²>0", 0)
+""
+
+julia> last("∀ϵ≠0: ϵ²>0", 1)
+"0"
+
+julia> last("∀ϵ≠0: ϵ²>0", 3)
+"²>0"
+```
+"""
+function last(str::AbstractString, nchar::Integer)
+    e = endof(str)
+    if 0 <= nchar <= 1
+        return str[(e-nchar+1):e]
+    end
+    str[prevind(str, e, nchar-1):e]
+end
+
+# reverse-order iteration for strings and indices thereof
+start(r::Iterators.Reverse{<:AbstractString}) = endof(r.itr)
+done(r::Iterators.Reverse{<:AbstractString}, i) = i < start(r.itr)
+next(r::Iterators.Reverse{<:AbstractString}, i) = (r.itr[i], prevind(r.itr, i))
+start(r::Iterators.Reverse{<:EachStringIndex}) = endof(r.itr.s)
+done(r::Iterators.Reverse{<:EachStringIndex}, i) = i < start(r.itr.s)
+next(r::Iterators.Reverse{<:EachStringIndex}, i) = (i, prevind(r.itr.s, i))

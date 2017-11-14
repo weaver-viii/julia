@@ -16,8 +16,8 @@ srand(123)
     @test one(UniformScaling(rand(Complex128))) == one(UniformScaling{Complex128})
     @test eltype(one(UniformScaling(rand(Complex128)))) == Complex128
     @test -one(UniformScaling(2)) == UniformScaling(-1)
-    @test sparse(3I,4,5) == spdiagm(fill(3,4),0,4,5)
-    @test sparse(3I,5,4) == spdiagm(fill(3,4),0,5,4)
+    @test sparse(3I,4,5) == sparse(1:4, 1:4, 3, 4, 5)
+    @test sparse(3I,5,4) == sparse(1:4, 1:4, 3, 5, 4)
     @test norm(UniformScaling(1+im)) ≈ sqrt(2)
 end
 
@@ -35,6 +35,7 @@ end
     @test 4.3*eye(2) ≈ UniformScaling(4.32) rtol=0.1 atol=0.01
     @test [4.3201 0.002;0.001 4.32009] ≈ UniformScaling(4.32) rtol=0.1 atol=0.
     @test UniformScaling(4.32) ≉ 4.3*ones(2,2) rtol=0.1 atol=0.01
+    @test UniformScaling(4.32) ≈ 4.32*eye(2)
 end
 
 @testset "arithmetic with Number" begin
@@ -50,7 +51,7 @@ end
 end
 
 @testset "det and logdet" begin
-    @test det(I) === 1
+    @test det(I) === true
     @test det(1.0I) === 1.0
     @test det(0I) === 0
     @test det(0.0I) === 0.0
@@ -187,4 +188,60 @@ end
         @test chol(λ*I) ≈ √λ*I
         @test_throws LinAlg.PosDefException chol(-λ*I)
     end
+end
+
+@testset "Matrix construction from UniformScaling" begin
+    @test Matrix(2I, 3)::Matrix{Int} == 2*eye(3)
+    @test Matrix(2I, 3, 3)::Matrix{Int} == 2*eye(3)
+    @test Matrix(2I, 3, 4)::Matrix{Int} == 2*eye(3, 4)
+    @test Matrix(2I, 4, 3)::Matrix{Int} == 2*eye(4, 3)
+    @test Matrix(2.0I, 3, 3)::Matrix{Float64} == 2*eye(3)
+    @test Matrix{Real}(2I, 3)::Matrix{Real} == 2*eye(3)
+    @test Matrix{Real}(2I, 3, 3)::Matrix{Real} == 2*eye(3)
+    @test Matrix{Float64}(2I, 3, 3)::Matrix{Float64} == 2*eye(3)
+end
+
+@testset "Diagonal construction from UniformScaling" begin
+    @test Diagonal(2I, 3)::Diagonal{Int} == 2*eye(3)
+    @test Diagonal(2.0I, 3)::Diagonal{Float64} == 2*eye(3)
+    @test Diagonal{Real}(2I, 3)::Diagonal{Real} == 2*eye(3)
+    @test Diagonal{Float64}(2I, 3)::Diagonal{Float64} == 2*eye(3)
+end
+
+@testset "equality comparison of matrices with UniformScaling" begin
+    # AbstractMatrix methods
+    diagI = Diagonal(fill(1, 3))
+    rdiagI = view(diagI, 1:2, 1:3)
+    bidiag = Bidiagonal(fill(2, 3), fill(2, 2), :U)
+    @test diagI  ==  I == diagI  # test isone(I) path / equality
+    @test 2diagI !=  I != 2diagI # test isone(I) path / inequality
+    @test 0diagI == 0I == 0diagI # test iszero(I) path / equality
+    @test 2diagI != 0I != 2diagI # test iszero(I) path / inequality
+    @test 2diagI == 2I == 2diagI # test generic path / equality
+    @test 0diagI != 2I != 0diagI # test generic path / inequality on diag
+    @test bidiag != 2I != bidiag # test generic path / inequality off diag
+    @test rdiagI !=  I != rdiagI # test square matrix check
+    # StridedMatrix specialization
+    denseI = eye(3)
+    rdenseI = eye(3, 4)
+    alltwos = fill(2, (3, 3))
+    @test denseI  ==  I == denseI  # test isone(I) path / equality
+    @test 2denseI !=  I != 2denseI # test isone(I) path / inequality
+    @test 0denseI == 0I == 0denseI # test iszero(I) path / equality
+    @test 2denseI != 0I != 2denseI # test iszero(I) path / inequality
+    @test 2denseI == 2I == 2denseI # test generic path / equality
+    @test 0denseI != 2I != 0denseI # test generic path / inequality on diag
+    @test alltwos != 2I != alltwos # test generic path / inequality off diag
+    @test rdenseI !=  I != rdenseI # test square matrix check
+end
+
+@testset "operations involving I should preserve eltype" begin
+    @test isa(Int8(1) + I, Int8)
+    @test isa(Float16(1) + I, Float16)
+    @test eltype(Int8(1)I) == Int8
+    @test eltype(Float16(1)I) == Float16
+    @test eltype(fill(Int8(1), 2, 2)I) == Int8
+    @test eltype(fill(Float16(1), 2, 2)I) == Float16
+    @test eltype(fill(Int8(1), 2, 2) + I) == Int8
+    @test eltype(fill(Float16(1), 2, 2) + I) == Float16
 end
