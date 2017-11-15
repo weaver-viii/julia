@@ -252,24 +252,24 @@ function length(s::String)
 
         (i += 1) ≤ z || break
         @inbounds b = codeunit(s, i) # cont byte 1
-        (b & 0xc0 == 0x80) || @goto L
-        (l ≥ 0xe0) || continue
+        b & 0xc0 == 0x80 || @goto L
+        l ≥ 0xe0 || continue
 
         (i += 1) ≤ z || break
         @inbounds b = codeunit(s, i) # cont byte 2
-        (b & 0xc0 == 0x80) || @goto L
-        (l ≥ 0xf0) || continue
+        b & 0xc0 == 0x80 || @goto L
+        l ≥ 0xf0 || continue
 
         (i += 1) ≤ z || break
         @inbounds b = codeunit(s, i) # cont byte 3
-        (b & 0xc0 == 0x80) || @goto L
+        b & 0xc0 == 0x80 || @goto L
     end
     return n
 end
 
 first_utf8_byte(c::Char) = (reinterpret(UInt32, c) >> 24) % UInt8
 
-function reverseind(s::String, i::Integer)
+function reverseind(s::String, i::Int)
     j = sizeof(s) + 1 - i
     @inbounds while is_valid_continuation(codeunit(s, j))
         j -= 1
@@ -279,8 +279,9 @@ end
 
 ## overload methods for efficiency ##
 
-isvalid(s::String, i::Integer) =
-    (1 <= i <= sizeof(s)) && ((@inbounds b = codeunit(s, i)); !is_valid_continuation(b))
+function isvalid(s::String, i::Int)
+
+end
 
 function getindex(s::String, r::UnitRange{Int})
     isempty(r) && return ""
