@@ -14,8 +14,8 @@ using Test
     @test ones(0,0)*ones(0,0) == zeros(0,0)
     @test Array{Float64}(5, 0) |> t -> t't == zeros(0,0)
     @test Array{Float64}(5, 0) |> t -> t*t' == zeros(5,5)
-    @test Array{Complex128}(5, 0) |> t -> t't == zeros(0,0)
-    @test Array{Complex128}(5, 0) |> t -> t*t' == zeros(5,5)
+    @test Array{Complex{Float64}}(5, 0) |> t -> t't == zeros(0,0)
+    @test Array{Complex{Float64}}(5, 0) |> t -> t*t' == zeros(5,5)
 end
 @testset "2x2 matmul" begin
     AA = [1 2; 3 4]
@@ -165,7 +165,7 @@ end
     @test At_mul_B!(sC, A, B) == A'*B
 
     Aim = A .- im
-    C = zeros(Complex128,8,8)
+    C = zeros(Complex{Float64},8,8)
     sC = view(C, 1:2:8, 1:2:8)
     B = reshape(map(Float64,-9:10),5,4) .+ im
     @test Ac_mul_B!(sC, Aim, Aim) == Aim'*Aim
@@ -213,7 +213,7 @@ end
 # issue #6450
 @test dot(Any[1.0,2.0], Any[3.5,4.5]) === 12.5
 
-@testset "dot" for elty in (Float32, Float64, Complex64, Complex128)
+@testset "dot" for elty in (Float32, Float64, Complex{Float32}, Complex{Float64})
     x = convert(Vector{elty},[1.0, 2.0, 3.0])
     y = convert(Vector{elty},[3.5, 4.5, 5.5])
     @test_throws DimensionMismatch dot(x, 1:2, y, 1:3)
@@ -260,7 +260,7 @@ end
 
 @test_throws ArgumentError Base.LinAlg.copytri!(ones(10,10),'Z')
 
-@testset "gemv! and gemm_wrapper for $elty" for elty in [Float32,Float64,Complex128,Complex64]
+@testset "gemv! and gemm_wrapper for $elty" for elty in [Float32,Float64,Complex{Float64},Complex{Float32}]
     @test_throws DimensionMismatch Base.LinAlg.gemv!(ones(elty,10),'N',rand(elty,10,10),ones(elty,11))
     @test_throws DimensionMismatch Base.LinAlg.gemv!(ones(elty,11),'N',rand(elty,10,10),ones(elty,10))
     @test Base.LinAlg.gemv!(ones(elty,0),'N',rand(elty,0,0),rand(elty,0)) == ones(elty,0)

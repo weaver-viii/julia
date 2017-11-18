@@ -4,11 +4,11 @@ import Base.LinAlg, Base.LinAlg.BlasReal, Base.LinAlg.BlasComplex
 
 srand(100)
 ## BLAS tests - testing the interface code to BLAS routines
-@testset for elty in [Float32, Float64, Complex64, Complex128]
+@testset for elty in [Float32, Float64, Complex{Float32}, Complex{Float64}]
     @testset "syr2k!" begin
         U = randn(5,2)
         V = randn(5,2)
-        if elty == Complex64 || elty == Complex128
+        if elty == Complex{Float32} || elty == Complex{Float64}
             U = complex.(U, U)
             V = complex.(V, V)
         end
@@ -20,7 +20,7 @@ srand(100)
         @test triu(LinAlg.BLAS.syr2k('U','T',U,V)) ≈ triu(U.'*V + V.'*U)
     end
 
-    if elty in (Complex64, Complex128)
+    if elty in (Complex{Float32}, Complex{Float64})
         @testset "her2k!" begin
             U = randn(5,2)
             V = randn(5,2)

@@ -65,6 +65,9 @@ const liblapack = Base.liblapack_name
 
 import ..LinAlg: BlasReal, BlasComplex, BlasFloat, BlasInt, DimensionMismatch, checksquare, axpy!
 
+const Complex64 = Complex{Float32}
+const Complex128 = Complex{Float64}
+
 # utility routines
 function vendor()
     lib = Libdl.dlopen_e(Base.libblas_name)
@@ -169,8 +172,8 @@ function blascopy! end
 
 for (fname, elty) in ((:dcopy_,:Float64),
                       (:scopy_,:Float32),
-                      (:zcopy_,:Complex128),
-                      (:ccopy_,:Complex64))
+                      (:zcopy_,Complex{Float64}),
+                      (:ccopy_,Complex{Float32}))
     @eval begin
         # SUBROUTINE DCOPY(N,DX,INCX,DY,INCY)
         function blascopy!(n::Integer, DX::Union{Ptr{$elty},StridedArray{$elty}}, incx::Integer, DY::Union{Ptr{$elty},StridedArray{$elty}}, incy::Integer)

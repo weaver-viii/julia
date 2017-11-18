@@ -548,7 +548,7 @@ for i = 1:100; @eval fLargeTable(::Any, ::Val{$i}) = 2; end
 fLargeTable(::Any...) = 3
 @test length(methods(fLargeTable, Tuple{})) == 1
 fLargeTable(::Complex, ::Complex) = 4
-fLargeTable(::Union{Complex64, Complex128}...) = 5
+fLargeTable(::Union{Complex{Float32}, Complex{Float64}}...) = 5
 @test length(methods(fLargeTable, Tuple{})) == 1
 fLargeTable() = 4
 @test length(methods(fLargeTable)) == 204
@@ -707,7 +707,7 @@ struct B20086{T,N} <: A20086{T,N} end
 
 # sizeof and nfields
 @test sizeof(Int16) == 2
-@test sizeof(Complex128) == 16
+@test sizeof(Complex{Float64}) == 16
 primitive type ParameterizedByte__{A,B} 8 end
 @test sizeof(ParameterizedByte__) == 1
 @test sizeof(nothing) == 0
@@ -721,7 +721,7 @@ end
 @test sizeof(Symbol("")) == 0
 @test_throws(ErrorException("argument is an abstract type; size is indeterminate"),
              sizeof(Real))
-@test sizeof(Union{Complex64,Complex128}) == 16
+@test sizeof(Union{Complex{Float32},Complex{Float64}}) == 16
 @test sizeof(Union{Int8,UInt8}) == 1
 @test_throws ErrorException sizeof(AbstractArray)
 @test_throws ErrorException sizeof(Tuple)
@@ -737,8 +737,8 @@ end
 @test nfields(1) == 0
 @test fieldcount(Union{}) == 0
 @test fieldcount(Tuple{Any,Any,T} where T) == 3
-@test fieldcount(Complex) == fieldcount(Complex64) == 2
-@test fieldcount(Union{Complex64,Complex128}) == 2
+@test fieldcount(Complex) == fieldcount(Complex{Float32}) == 2
+@test fieldcount(Union{Complex{Float32},Complex{Float64}}) == 2
 @test fieldcount(Int) == 0
 @test_throws(ErrorException("type does not have a definite number of fields"),
              fieldcount(Union{Complex,Pair}))

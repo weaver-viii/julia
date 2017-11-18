@@ -15,6 +15,8 @@ struct MatrixIllConditionedException <: Exception
     msg::AbstractString
 end
 
+const Complex128 = Complex{Float64}
+
 function umferror(status::Integer)
     if status==UMFPACK_OK
         return
@@ -66,7 +68,7 @@ else
     const UMFITypes = Union{Int32, Int64}
 end
 
-const UMFVTypes = Union{Float64,Complex128}
+const UMFVTypes = Union{Float64,Complex{Float64}}
 
 ## UMFPACK
 
@@ -107,7 +109,7 @@ end
 Compute the LU factorization of a sparse matrix `A`.
 
 For sparse `A` with real or complex element type, the return type of `F` is
-`UmfpackLU{Tv, Ti}`, with `Tv` = [`Float64`](@ref) or `Complex128` respectively and
+`UmfpackLU{Tv, Ti}`, with `Tv` = [`Float64`](@ref) or `Complex{Float64}` respectively and
 `Ti` is an integer type ([`Int32`](@ref) or [`Int64`](@ref)).
 
 The individual components of the factorization `F` can be accessed by indexing:
@@ -134,8 +136,8 @@ The relation between `F` and `A` is
 !!! note
     `lufact(A::SparseMatrixCSC)` uses the UMFPACK library that is part of
     SuiteSparse. As this library only supports sparse matrices with [`Float64`](@ref) or
-    `Complex128` elements, `lufact` converts `A` into a copy that is of type
-    `SparseMatrixCSC{Float64}` or `SparseMatrixCSC{Complex128}` as appropriate.
+    `Complex{Float64}` elements, `lufact` converts `A` into a copy that is of type
+    `SparseMatrixCSC{Float64}` or `SparseMatrixCSC{Complex{Float64}}` as appropriate.
 """
 function lufact(S::SparseMatrixCSC{<:UMFVTypes,<:UMFITypes})
     zerobased = S.colptr[1] == 0
@@ -148,11 +150,11 @@ function lufact(S::SparseMatrixCSC{<:UMFVTypes,<:UMFITypes})
 end
 lufact(A::SparseMatrixCSC{<:Union{Float16,Float32},Ti}) where {Ti<:UMFITypes} =
     lufact(convert(SparseMatrixCSC{Float64,Ti}, A))
-lufact(A::SparseMatrixCSC{<:Union{Complex32,Complex64},Ti}) where {Ti<:UMFITypes} =
-    lufact(convert(SparseMatrixCSC{Complex128,Ti}, A))
+lufact(A::SparseMatrixCSC{<:Union{Complex{Float16},Complex{Float32}},Ti}) where {Ti<:UMFITypes} =
+    lufact(convert(SparseMatrixCSC{Complex{Float64},Ti}, A))
 lufact(A::Union{SparseMatrixCSC{T},SparseMatrixCSC{Complex{T}}}) where {T<:AbstractFloat} =
     throw(ArgumentError(string("matrix type ", typeof(A), "not supported. ",
-    "Try lufact(convert(SparseMatrixCSC{Float64/Complex128,Int}, A)) for ",
+    "Try lufact(convert(SparseMatrixCSC{Float64/Complex{Float64},Int}, A)) for ",
     "sparse floating point LU using UMFPACK or lufact(Array(A)) for generic ",
     "dense LU.")))
 lufact(A::SparseMatrixCSC) = lufact(float(A))

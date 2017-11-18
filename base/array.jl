@@ -384,7 +384,7 @@ For convenience `dims` may also be passed in variadic form.
 
 # Examples
 ```jldoctest
-julia> ones(Complex128, 2, 3)
+julia> ones(Complex{Float64}, 2, 3)
 2×3 Array{Complex{Float64},2}:
  1.0+0.0im  1.0+0.0im  1.0+0.0im
  1.0+0.0im  1.0+0.0im  1.0+0.0im

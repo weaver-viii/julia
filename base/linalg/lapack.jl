@@ -14,6 +14,9 @@ import ..LinAlg: BlasFloat, Char, BlasInt, LAPACKException,
 
 using Base: iszero
 
+const Complex64 = Complex{Float32}
+const Complex128 = Complex{Float64}
+
 #Generic LAPACK error handlers
 """
 Handle only negative LAPACK error codes

@@ -12,9 +12,9 @@ srand(123)
     @test one(UniformScaling{Float32}) == UniformScaling(one(Float32))
     @test zero(UniformScaling{Float32}) == UniformScaling(zero(Float32))
     @test eltype(one(UniformScaling{Float32})) == Float32
-    @test zero(UniformScaling(rand(Complex128))) == zero(UniformScaling{Complex128})
-    @test one(UniformScaling(rand(Complex128))) == one(UniformScaling{Complex128})
-    @test eltype(one(UniformScaling(rand(Complex128)))) == Complex128
+    @test zero(UniformScaling(rand(Complex{Float64}))) == zero(UniformScaling{Complex{Float64}})
+    @test one(UniformScaling(rand(Complex{Float64}))) == one(UniformScaling{Complex{Float64}})
+    @test eltype(one(UniformScaling(rand(Complex{Float64})))) == Complex{Float64}
     @test -one(UniformScaling(2)) == UniformScaling(-1)
     @test sparse(3I,4,5) == sparse(1:4, 1:4, 3, 4, 5)
     @test sparse(3I,5,4) == sparse(1:4, 1:4, 3, 5, 4)
@@ -60,7 +60,7 @@ end
 end
 
 @test copy(UniformScaling(one(Float64))) == UniformScaling(one(Float64))
-@test sprint(show,UniformScaling(one(Complex128))) == "UniformScaling{Complex{Float64}}\n(1.0 + 0.0im)*I"
+@test sprint(show,UniformScaling(one(Complex{Float64}))) == "UniformScaling{Complex{Float64}}\n(1.0 + 0.0im)*I"
 @test sprint(show,UniformScaling(one(Float32))) == "UniformScaling{Float32}\n1.0*I"
 
 let
@@ -183,7 +183,7 @@ end
 end
 
 @testset "chol" begin
-    for T in (Float64, Complex64, BigFloat, Int)
+    for T in (Float64, Complex{Float32}, BigFloat, Int)
         λ = T(4)
         @test chol(λ*I) ≈ √λ*I
         @test_throws LinAlg.PosDefException chol(-λ*I)

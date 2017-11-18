@@ -30,8 +30,8 @@ srand(1)
 
     @testset "Basic properties" begin
         @test_throws ArgumentError size(D,0)
-        @test typeof(convert(Diagonal{Complex64},D)) <: Diagonal{Complex64}
-        @test typeof(convert(AbstractMatrix{Complex64},D)) <: Diagonal{Complex64}
+        @test typeof(convert(Diagonal{Complex{Float32}},D)) <: Diagonal{Complex{Float32}}
+        @test typeof(convert(AbstractMatrix{Complex{Float32}},D)) <: Diagonal{Complex{Float32}}
 
         @test Array(real(D)) == real(DM)
         @test Array(abs.(D)) == abs.(DM)
@@ -389,7 +389,7 @@ end
 end
 
 @testset "multiplication with Symmetric/Hermitian" begin
-    for T in (Float64, Complex128)
+    for T in (Float64, Complex{Float64})
         D = Diagonal(randn(T, n))
         A = randn(T, n, n); A = A'A
         S = Symmetric(A)

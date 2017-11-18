@@ -156,7 +156,7 @@ srand(1)
                     b += im*convert(Matrix{elty}, rand(1:10, n, 2))
                 end
             end
-            condT = cond(map(Complex128,Tfull))
+            condT = cond(map(Complex{Float64},Tfull))
             promty = typeof((zero(relty)*zero(relty) + zero(relty)*zero(relty))/one(relty))
             if relty != BigFloat
                 x = T.'\c.'
@@ -233,7 +233,7 @@ srand(1)
         @testset "Eigensystems" begin
             if relty <: AbstractFloat
                 d1, v1 = eig(T)
-                d2, v2 = eig(map(elty<:Complex ? Complex128 : Float64,Tfull))
+                d2, v2 = eig(map(elty<:Complex ? Complex{Float64} : Float64,Tfull))
                 @test (uplo == :U ? d1 : reverse(d1)) ≈ d2
                 if elty <: Real
                     Test.test_approx_eq_modphase(v1, uplo == :U ? v2 : v2[:,n:-1:1])

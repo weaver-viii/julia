@@ -185,8 +185,8 @@ end
         b = randn(5,3) + im*randn(5,3)
         c = randn(5) + im*randn(5)
         d = randn(5) + im*randn(5)
-        α = rand(Complex128)
-        β = rand(Complex128)
+        α = rand(Complex{Float64})
+        β = rand(Complex{Float64})
         @test (maximum(abs.(a*b - Array(a)*b)) < 100*eps())
         @test (maximum(abs.(A_mul_B!(similar(b), a, b) - Array(a)*b)) < 100*eps()) # for compatibility with present matmul API. Should go away eventually.
         @test (maximum(abs.(A_mul_B!(similar(c), a, c) - Array(a)*c)) < 100*eps()) # for compatibility with present matmul API. Should go away eventually.
@@ -1457,7 +1457,7 @@ end
 end
 
 @testset "diag" begin
-    for T in (Float64, Complex128)
+    for T in (Float64, Complex{Float64})
         S1 = sprand(T,  5,  5, 0.5)
         S2 = sprand(T, 10,  5, 0.5)
         S3 = sprand(T,  5, 10, 0.5)
@@ -1537,7 +1537,7 @@ end
     @test ishermitian(A) == false
     @test issymmetric(A) == false
 
-    A = speye(Complex128, 5,5)
+    A = speye(Complex{Float64}, 5,5)
     A[3,2] = 1.0 + im
     @test ishermitian(A) == false
     @test issymmetric(A) == false
@@ -1550,7 +1550,7 @@ end
     @test issymmetric(A) == true
 
     # explicit zeros
-    A = speye(Complex128, 5,5)
+    A = speye(Complex{Float64}, 5,5)
     A[3,1] = 2
     A.nzval[2] = 0.0
     @test ishermitian(A) == true
@@ -2079,11 +2079,11 @@ end
 
 @testset "similar with type conversion" begin
     local A = speye(5)
-    @test size(similar(A, Complex128, Int)) == (5, 5)
-    @test typeof(similar(A, Complex128, Int)) == SparseMatrixCSC{Complex128, Int}
-    @test size(similar(A, Complex128, Int8)) == (5, 5)
-    @test typeof(similar(A, Complex128, Int8)) == SparseMatrixCSC{Complex128, Int8}
-    @test similar(A, Complex128,(6, 6)) == spzeros(Complex128, 6, 6)
+    @test size(similar(A, Complex{Float64}, Int)) == (5, 5)
+    @test typeof(similar(A, Complex{Float64}, Int)) == SparseMatrixCSC{Complex{Float64}, Int}
+    @test size(similar(A, Complex{Float64}, Int8)) == (5, 5)
+    @test typeof(similar(A, Complex{Float64}, Int8)) == SparseMatrixCSC{Complex{Float64}, Int8}
+    @test similar(A, Complex{Float64},(6, 6)) == spzeros(Complex{Float64}, 6, 6)
     @test convert(Matrix, A) == Array(A) # lolwut, are you lost, test?
 end
 

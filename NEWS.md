@@ -622,6 +622,10 @@ Deprecated or removed
   * `a:b` is deprecated for constructing a `StepRange` when `a` and `b` have physical units
     (Dates and Times). Use `a:s:b`, where `s = Dates.Day(1)` or `s = Dates.Second(1)`.
 
+  * The aliases `Complex32`, `Complex64` and `Complex128` have been deprecated in favor of `Complex{Float16}`,
+    `Complex{Float32}` and `Complex{Float64}` respectively (#24647).
+
+
 Command-line option changes
 ---------------------------
 

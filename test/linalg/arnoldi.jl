@@ -12,8 +12,8 @@ using Test
 
         testtol = 1e-6
 
-        @testset for elty in (Float64, Complex128)
-            if elty == Complex64 || elty == Complex128
+        @testset for elty in (Float64, Complex{Float64})
+            if elty == Complex{Float32} || elty == Complex{Float64}
                 a = acmplx
                 b = bcmplx
             else
@@ -89,7 +89,7 @@ using Test
                 if elty == Float64
                     @test_throws ArgumentError eigs(a+a.',which=:SI)
                     @test_throws ArgumentError eigs(a+a.',which=:LI)
-                    @test_throws ArgumentError eigs(a,sigma=rand(Complex64))
+                    @test_throws ArgumentError eigs(a,sigma=rand(Complex{Float32}))
                 end
             end
         end

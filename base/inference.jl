@@ -2460,7 +2460,7 @@ function abstract_call(@nospecialize(f), fargs::Union{Tuple{},Vector{Any}}, argt
             length(argtypes) == 3 && (argtypes[3] ⊑ Int32 || argtypes[3] ⊑ Int64)
 
             a1 = argtypes[2]
-            basenumtype = Union{corenumtype, Main.Base.Complex64, Main.Base.Complex128, Main.Base.Rational}
+            basenumtype = Union{corenumtype, Main.Base.Complex{Float32}, Main.Base.Complex{Float64}, Main.Base.Rational}
             if a1 ⊑ basenumtype
                 ftimes = Main.Base.:*
                 ta1 = widenconst(a1)
@@ -5249,7 +5249,7 @@ function inlining_pass(e::Expr, sv::OptimizationState, stmts::Vector{Any}, ins, 
             triple = (a2 === Int32(3) || a2 === Int64(3))
             if square || triple
                 a1 = e.args[2]
-                basenumtype = Union{corenumtype, Main.Base.Complex64, Main.Base.Complex128, Main.Base.Rational}
+                basenumtype = Union{corenumtype, Main.Base.Complex{Float32}, Main.Base.Complex{Float64}, Main.Base.Rational}
                 if isa(a1, basenumtype) || ((isa(a1, Symbol) || isa(a1, Slot) || isa(a1, SSAValue)) &&
                                            exprtype(a1, sv.src, sv.mod) ⊑ basenumtype)
                     if square

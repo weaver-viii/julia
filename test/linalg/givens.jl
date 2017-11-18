@@ -3,7 +3,7 @@
 using Test
 
 # Test givens rotations
-@testset for elty in (Float32, Float64, Complex64, Complex128)
+@testset for elty in (Float32, Float64, Complex{Float32}, Complex{Float64})
     if elty <: Real
         raw_A = convert(Matrix{elty}, randn(10,10))
     else

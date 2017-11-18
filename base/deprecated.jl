@@ -2097,6 +2097,11 @@ end
     @deprecate chol!(x::Number, uplo) chol(x) false
 end
 
+# #24647
+@deprecate_binding Complex32  Complex{Float16}
+@deprecate_binding Complex64  Complex{Float32}
+@deprecate_binding Complex128 Complex{Float64}
+
 # END 0.7 deprecations
 
 # BEGIN 1.0 deprecations
