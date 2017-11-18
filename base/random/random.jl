@@ -42,12 +42,12 @@ Base.eltype(::Type{<:FloatInterval{T}}) where {T<:AbstractFloat} = T
 
 const BitFloatType = Union{Type{Float16},Type{Float32},Type{Float64}}
 
-### State
+### Sample
 
-abstract type State end
+abstract type Sample end
 
 # temporarily for BaseBenchmarks
-RangeGenerator(x) = State(GLOBAL_RNG, x)
+RangeGenerator(x) = Sample(GLOBAL_RNG, x)
 
 # In some cases, when only 1 random value is to be generated,
 # the optimal sampler can be different than if multiple values
@@ -57,49 +57,49 @@ const Repetition = Union{Val{1},Val{Inf}}
 
 # these default fall-back for all RNGs would be nice,
 # but generate difficult-to-solve ambiguities
-# State(::AbstractRNG, X, ::Val{Inf}) = State(X)
-# State(::AbstractRNG, ::Type{X}, ::Val{Inf}) where {X} = State(X)
+# Sample(::AbstractRNG, X, ::Val{Inf}) = Sample(X)
+# Sample(::AbstractRNG, ::Type{X}, ::Val{Inf}) where {X} = Sample(X)
 
-State(rng::AbstractRNG, st::State, ::Repetition) =
-    throw(ArgumentError("State for this object is not defined"))
+Sample(rng::AbstractRNG, st::Sample, ::Repetition) =
+    throw(ArgumentError("Sample for this object is not defined"))
 
 # default shortcut for the general case
-State(rng::AbstractRNG, X) = State(rng, X, Val(Inf))
-State(rng::AbstractRNG, ::Type{X}) where {X} = State(rng, X, Val(Inf))
+Sample(rng::AbstractRNG, X) = Sample(rng, X, Val(Inf))
+Sample(rng::AbstractRNG, ::Type{X}) where {X} = Sample(rng, X, Val(Inf))
 
-#### pre-defined useful State subtypes
+#### pre-defined useful Sample subtypes
 
 # default fall-back for types
-struct StateType{T} <: State end
+struct SampleType{T} <: Sample end
 
-State(::AbstractRNG, ::Type{T}, ::Repetition) where {T} = StateType{T}()
+Sample(::AbstractRNG, ::Type{T}, ::Repetition) where {T} = SampleType{T}()
 
-Base.getindex(st::StateType{T}) where {T} = T
+Base.getindex(st::SampleType{T}) where {T} = T
 
 # default fall-back for values
-struct StateTrivial{T} <: State
+struct SampleTrivial{T} <: Sample
     self::T
 end
 
-State(::AbstractRNG, X, ::Repetition) = StateTrivial(X)
+Sample(::AbstractRNG, X, ::Repetition) = SampleTrivial(X)
 
-Base.getindex(st::StateTrivial) = st.self
+Base.getindex(st::SampleTrivial) = st.self
 
-struct StateSimple{T,S} <: State
+struct SampleSimple{T,S} <: Sample
     self::T
     state::S
 end
 
-Base.getindex(st::StateSimple) = st.self
+Base.getindex(st::SampleSimple) = st.self
 
 
-### machinery for generation with State
+### machinery for generation with Sample
 
 #### scalars
 
-rand(rng::AbstractRNG, X) = rand(rng, State(rng, X, Val(1)))
+rand(rng::AbstractRNG, X) = rand(rng, Sample(rng, X, Val(1)))
 rand(rng::AbstractRNG=GLOBAL_RNG, ::Type{X}=Float64) where {X} =
-    rand(rng, State(rng, X, Val(1)))
+    rand(rng, Sample(rng, X, Val(1)))
 
 rand(X) = rand(GLOBAL_RNG, X)
 rand(::Type{X}) where {X} = rand(GLOBAL_RNG, X)
@@ -109,10 +109,10 @@ rand(::Type{X}) where {X} = rand(GLOBAL_RNG, X)
 rand!(A::AbstractArray{T}, X) where {T} = rand!(GLOBAL_RNG, A, X)
 rand!(A::AbstractArray{T}, ::Type{X}=T) where {T,X} = rand!(GLOBAL_RNG, A, X)
 
-rand!(rng::AbstractRNG, A::AbstractArray{T}, X) where {T} = rand!(rng, A, State(rng, X))
-rand!(rng::AbstractRNG, A::AbstractArray{T}, ::Type{X}=T) where {T,X} = rand!(rng, A, State(rng, X))
+rand!(rng::AbstractRNG, A::AbstractArray{T}, X) where {T} = rand!(rng, A, Sample(rng, X))
+rand!(rng::AbstractRNG, A::AbstractArray{T}, ::Type{X}=T) where {T,X} = rand!(rng, A, Sample(rng, X))
 
-function rand!(rng::AbstractRNG, A::AbstractArray{T}, st::State) where T
+function rand!(rng::AbstractRNG, A::AbstractArray{T}, st::Sample) where T
     for i in eachindex(A)
         @inbounds A[i] = rand(rng, st)
     end
