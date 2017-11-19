@@ -14,9 +14,6 @@ import ..LinAlg: BlasFloat, Char, BlasInt, LAPACKException,
 
 using Base: iszero
 
-const Complex64 = Complex{Float32}
-const Complex128 = Complex{Float64}
-
 #Generic LAPACK error handlers
 """
 Handle only negative LAPACK error codes
@@ -111,8 +108,8 @@ end
 for (gbtrf, gbtrs, elty) in
     ((:dgbtrf_,:dgbtrs_,:Float64),
      (:sgbtrf_,:sgbtrs_,:Float32),
-     (:zgbtrf_,:zgbtrs_,:Complex128),
-     (:cgbtrf_,:cgbtrs_,:Complex64))
+     (:zgbtrf_,:zgbtrs_,Complex{Float64}),
+     (:cgbtrf_,:cgbtrs_,Complex{Float32}))
     @eval begin
         # SUBROUTINE DGBTRF( M, N, KL, KU, AB, LDAB, IPIV, INFO )
         # *     .. Scalar Arguments ..
@@ -188,8 +185,8 @@ gbtrs!(trans::Char, kl::Integer, ku::Integer, m::Integer, AB::StridedMatrix, ipi
 for (gebal, gebak, elty, relty) in
     ((:dgebal_, :dgebak_, :Float64, :Float64),
      (:sgebal_, :sgebak_, :Float32, :Float32),
-     (:zgebal_, :zgebak_, :Complex128, :Float64),
-     (:cgebal_, :cgebak_, :Complex64, :Float32))
+     (:zgebal_, :zgebak_, Complex{Float64}, :Float64),
+     (:cgebal_, :cgebak_, Complex{Float32}, :Float32))
     @eval begin
         #     SUBROUTINE DGEBAL( JOB, N, A, LDA, ILO, IHI, SCALE, INFO )
         #*     .. Scalar Arguments ..
@@ -269,8 +266,8 @@ gebak!(job::Char, side::Char, ilo::BlasInt, ihi::BlasInt, scale::StridedVector, 
 for (gebrd, gelqf, geqlf, geqrf, geqp3, geqrt, geqrt3, gerqf, getrf, elty, relty) in
     ((:dgebrd_,:dgelqf_,:dgeqlf_,:dgeqrf_,:dgeqp3_,:dgeqrt_,:dgeqrt3_,:dgerqf_,:dgetrf_,:Float64,:Float64),
      (:sgebrd_,:sgelqf_,:sgeqlf_,:sgeqrf_,:sgeqp3_,:sgeqrt_,:sgeqrt3_,:sgerqf_,:sgetrf_,:Float32,:Float32),
-     (:zgebrd_,:zgelqf_,:zgeqlf_,:zgeqrf_,:zgeqp3_,:zgeqrt_,:zgeqrt3_,:zgerqf_,:zgetrf_,:Complex128,:Float64),
-     (:cgebrd_,:cgelqf_,:cgeqlf_,:cgeqrf_,:cgeqp3_,:cgeqrt_,:cgeqrt3_,:cgerqf_,:cgetrf_,:Complex64,:Float32))
+     (:zgebrd_,:zgelqf_,:zgeqlf_,:zgeqrf_,:zgeqp3_,:zgeqrt_,:zgeqrt3_,:zgerqf_,:zgetrf_,Complex{Float64},:Float64),
+     (:cgebrd_,:cgelqf_,:cgeqlf_,:cgeqrf_,:cgeqp3_,:cgeqrt_,:cgeqrt3_,:cgerqf_,:cgetrf_,Complex{Float32},:Float32))
     @eval begin
         # SUBROUTINE DGEBRD( M, N, A, LDA, D, E, TAUQ, TAUP, WORK, LWORK,
         #                    INFO )
@@ -746,8 +743,8 @@ end
 for (tzrzf, ormrz, elty) in
     ((:dtzrzf_,:dormrz_,:Float64),
      (:stzrzf_,:sormrz_,:Float32),
-     (:ztzrzf_,:zunmrz_,:Complex128),
-     (:ctzrzf_,:cunmrz_,:Complex64))
+     (:ztzrzf_,:zunmrz_,Complex{Float64}),
+     (:ctzrzf_,:cunmrz_,Complex{Float32}))
     @eval begin
          #       SUBROUTINE ZTZRZF( M, N, A, LDA, TAU, WORK, LWORK, INFO )
          #
@@ -849,8 +846,8 @@ tzrzf!(A::StridedMatrix)
 for (gels, gesv, getrs, getri, elty) in
     ((:dgels_,:dgesv_,:dgetrs_,:dgetri_,:Float64),
      (:sgels_,:sgesv_,:sgetrs_,:sgetri_,:Float32),
-     (:zgels_,:zgesv_,:zgetrs_,:zgetri_,:Complex128),
-     (:cgels_,:cgesv_,:cgetrs_,:cgetri_,:Complex64))
+     (:zgels_,:zgesv_,:zgetrs_,:zgetri_,Complex{Float64}),
+     (:cgels_,:cgesv_,:cgetrs_,:cgetri_,Complex{Float32}))
     @eval begin
         #      SUBROUTINE DGELS( TRANS, M, N, NRHS, A, LDA, B, LDB, WORK, LWORK,INFO)
         # *     .. Scalar Arguments ..
@@ -1085,8 +1082,8 @@ for (gesvx, elty) in
     end
 end
 for (gesvx, elty, relty) in
-    ((:zgesvx_,:Complex128,:Float64),
-     (:cgesvx_,:Complex64 ,:Float32))
+    ((:zgesvx_,Complex{Float64},:Float64),
+     (:cgesvx_,Complex{Float32} ,:Float32))
     @eval begin
         #     SUBROUTINE ZGESVX( FACT, TRANS, N, NRHS, A, LDA, AF, LDAF, IPIV,
         #                        EQUED, R, C, B, LDB, X, LDX, RCOND, FERR, BERR,
@@ -1282,8 +1279,8 @@ for (gelsd, gelsy, elty) in
 end
 
 for (gelsd, gelsy, elty, relty) in
-    ((:zgelsd_,:zgelsy_,:Complex128,:Float64),
-     (:cgelsd_,:cgelsy_,:Complex64,:Float32))
+    ((:zgelsd_,:zgelsy_,Complex{Float64},:Float64),
+     (:cgelsd_,:cgelsy_,Complex{Float32},:Float32))
     @eval begin
         # SUBROUTINE ZGELSD( M, N, NRHS, A, LDA, B, LDB, S, RCOND, RANK,
         #      $                   WORK, LWORK, RWORK, IWORK, INFO )
@@ -1401,8 +1398,8 @@ gelsy!(A::StridedMatrix, B::StridedVecOrMat, rcond::Real)
 
 for (gglse, elty) in ((:dgglse_, :Float64),
                       (:sgglse_, :Float32),
-                      (:zgglse_, :Complex128),
-                      (:cgglse_, :Complex64))
+                      (:zgglse_, Complex{Float64}),
+                      (:cgglse_, Complex{Float32}))
     @eval begin
         # SUBROUTINE DGGLSE( M, N, P, A, LDA, B, LDB, C, D, X, WORK, LWORK,
         #      $                   INFO )
@@ -1462,8 +1459,8 @@ gglse!(A::StridedMatrix, c::StridedVector, B::StridedMatrix, d::StridedVector)
 for (geev, gesvd, gesdd, ggsvd, elty, relty) in
     ((:dgeev_,:dgesvd_,:dgesdd_,:dggsvd_,:Float64,:Float64),
      (:sgeev_,:sgesvd_,:sgesdd_,:sggsvd_,:Float32,:Float32),
-     (:zgeev_,:zgesvd_,:zgesdd_,:zggsvd_,:Complex128,:Float64),
-     (:cgeev_,:cgesvd_,:cgesdd_,:cggsvd_,:Complex64,:Float32))
+     (:zgeev_,:zgesvd_,:zgesdd_,:zggsvd_,Complex{Float64},:Float64),
+     (:cgeev_,:cgesvd_,:cgesdd_,:cggsvd_,Complex{Float32},:Float32))
     @eval begin
         #      SUBROUTINE DGEEV( JOBVL, JOBVR, N, A, LDA, WR, WI, VL, LDVL, VR,
         #      $                  LDVR, WORK, LWORK, INFO )
@@ -1853,8 +1850,8 @@ for (f, elty) in ((:dggsvd3_, :Float64),
     end
 end
 
-for (f, elty, relty) in ((:zggsvd3_, :Complex128, :Float64),
-                         (:cggsvd3_, :Complex64, :Float32))
+for (f, elty, relty) in ((:zggsvd3_, Complex{Float64}, :Float64),
+                         (:cggsvd3_, Complex{Float32}, :Float32))
     @eval begin
         function ggsvd3!(jobu::Char, jobv::Char, jobq::Char, A::StridedMatrix{$elty}, B::StridedMatrix{$elty})
             chkstride1(A, B)
@@ -2077,8 +2074,8 @@ for (geevx, ggev, elty) in
 end
 
 for (geevx, ggev, elty, relty) in
-    ((:zgeevx_,:zggev_,:Complex128,:Float64),
-     (:cgeevx_,:cggev_,:Complex64,:Float32))
+    ((:zgeevx_,:zggev_,Complex{Float64},:Float64),
+     (:cgeevx_,:cggev_,Complex{Float32},:Float32))
     @eval begin
         #     SUBROUTINE ZGEEVX( BALANC, JOBVL, JOBVR, SENSE, N, A, LDA, W, VL,
         #                          LDVL, VR, LDVR, ILO, IHI, SCALE, ABNRM, RCONDE,
@@ -2285,8 +2282,8 @@ for (laic1, elty) in
     end
 end
 for (laic1, elty, relty) in
-    ((:zlaic1_,:Complex128,:Float64),
-     (:claic1_,:Complex64,:Float32))
+    ((:zlaic1_,Complex{Float64},:Float64),
+     (:claic1_,Complex{Float32},:Float32))
     @eval begin
        #  SUBROUTINE ZLAIC1( JOB, J, X, SEST, W, GAMMA, SESTPR, S, C )
        #
@@ -2322,8 +2319,8 @@ end
 for (gtsv, gttrf, gttrs, elty) in
     ((:dgtsv_,:dgttrf_,:dgttrs_,:Float64),
      (:sgtsv_,:sgttrf_,:sgttrs_,:Float32),
-     (:zgtsv_,:zgttrf_,:zgttrs_,:Complex128),
-     (:cgtsv_,:cgttrf_,:cgttrs_,:Complex64))
+     (:zgtsv_,:zgttrf_,:zgttrs_,Complex{Float64}),
+     (:cgtsv_,:cgttrf_,:cgttrs_,Complex{Float32}))
     @eval begin
         #       SUBROUTINE DGTSV( N, NRHS, DL, D, DU, B, LDB, INFO )
         #       .. Scalar Arguments ..
@@ -2451,8 +2448,8 @@ gttrs!(trans::Char, dl::StridedVector, d::StridedVector, du::StridedVector, du2:
 for (orglq, orgqr, orgql, orgrq, ormlq, ormqr, ormql, ormrq, gemqrt, elty) in
     ((:dorglq_,:dorgqr_,:dorgql_,:dorgrq_,:dormlq_,:dormqr_,:dormql_,:dormrq_,:dgemqrt_,:Float64),
      (:sorglq_,:sorgqr_,:sorgql_,:sorgrq_,:sormlq_,:sormqr_,:sormql_,:sormrq_,:sgemqrt_,:Float32),
-     (:zunglq_,:zungqr_,:zungql_,:zungrq_,:zunmlq_,:zunmqr_,:zunmql_,:zunmrq_,:zgemqrt_,:Complex128),
-     (:cunglq_,:cungqr_,:cungql_,:cungrq_,:cunmlq_,:cunmqr_,:cunmql_,:cunmrq_,:cgemqrt_,:Complex64))
+     (:zunglq_,:zungqr_,:zungql_,:zungrq_,:zunmlq_,:zunmqr_,:zunmql_,:zunmrq_,:zgemqrt_,Complex{Float64}),
+     (:cunglq_,:cungqr_,:cungql_,:cungrq_,:cunmlq_,:cunmqr_,:cunmql_,:cunmrq_,:cgemqrt_,Complex{Float32}))
     @eval begin
         # SUBROUTINE DORGLQ( M, N, K, A, LDA, TAU, WORK, LWORK, INFO )
         # *     .. Scalar Arguments ..
@@ -2921,8 +2918,8 @@ gemqrt!(side::Char, trans::Char, V::StridedMatrix, T::StridedMatrix, C::StridedV
 for (posv, potrf, potri, potrs, pstrf, elty, rtyp) in
     ((:dposv_,:dpotrf_,:dpotri_,:dpotrs_,:dpstrf_,:Float64,:Float64),
      (:sposv_,:spotrf_,:spotri_,:spotrs_,:spstrf_,:Float32,:Float32),
-     (:zposv_,:zpotrf_,:zpotri_,:zpotrs_,:zpstrf_,:Complex128,:Float64),
-     (:cposv_,:cpotrf_,:cpotri_,:cpotrs_,:cpstrf_,:Complex64,:Float32))
+     (:zposv_,:zpotrf_,:zpotri_,:zpotrs_,:zpstrf_,Complex{Float64},:Float64),
+     (:cposv_,:cpotrf_,:cpotri_,:cpotrs_,:cpstrf_,Complex{Float32},:Float32))
     @eval begin
         #     SUBROUTINE DPOSV( UPLO, N, NRHS, A, LDA, B, LDB, INFO )
         #*     .. Scalar Arguments ..
@@ -3105,8 +3102,8 @@ pstrf!(uplo::Char, A::StridedMatrix, tol::Real)
 for (ptsv, pttrf, elty, relty) in
     ((:dptsv_,:dpttrf_,:Float64,:Float64),
      (:sptsv_,:spttrf_,:Float32,:Float32),
-     (:zptsv_,:zpttrf_,:Complex128,:Float64),
-     (:cptsv_,:cpttrf_,:Complex64,:Float32))
+     (:zptsv_,:zpttrf_,Complex{Float64},:Float64),
+     (:cptsv_,:cpttrf_,Complex{Float32},:Float32))
     @eval begin
         #       SUBROUTINE DPTSV( N, NRHS, D, E, B, LDB, INFO )
         #       .. Scalar Arguments ..
@@ -3200,8 +3197,8 @@ for (pttrs, elty, relty) in
 end
 
 for (pttrs, elty, relty) in
-    ((:zpttrs_,:Complex128,:Float64),
-     (:cpttrs_,:Complex64,:Float32))
+    ((:zpttrs_,Complex{Float64},:Float64),
+     (:cpttrs_,Complex{Float32},:Float32))
     @eval begin
         #       SUBROUTINE ZPTTRS( UPLO, N, NRHS, D, E, B, LDB, INFO )
         # *     .. Scalar Arguments ..
@@ -3245,8 +3242,8 @@ pttrs!(D::StridedVector, E::StridedVector, B::StridedVecOrMat)
 for (trtri, trtrs, elty) in
     ((:dtrtri_,:dtrtrs_,:Float64),
      (:strtri_,:strtrs_,:Float32),
-     (:ztrtri_,:ztrtrs_,:Complex128),
-     (:ctrtri_,:ctrtrs_,:Complex64))
+     (:ztrtri_,:ztrtrs_,Complex{Float64}),
+     (:ctrtri_,:ctrtrs_,Complex{Float32}))
     @eval begin
         #     SUBROUTINE DTRTRI( UPLO, DIAG, N, A, LDA, INFO )
         #*     .. Scalar Arguments ..
@@ -3448,8 +3445,8 @@ for (trcon, trevc, trrfs, elty) in
 end
 
 for (trcon, trevc, trrfs, elty, relty) in
-    ((:ztrcon_,:ztrevc_,:ztrrfs_,:Complex128,:Float64),
-     (:ctrcon_,:ctrevc_,:ctrrfs_,:Complex64, :Float32))
+    ((:ztrcon_,:ztrevc_,:ztrrfs_,Complex{Float64},:Float64),
+     (:ctrcon_,:ctrevc_,:ctrrfs_,Complex{Float32}, :Float32))
     @eval begin
         # SUBROUTINE ZTRCON( NORM, UPLO, DIAG, N, A, LDA, RCOND, WORK,
         #                   RWORK, INFO )
@@ -3620,8 +3617,8 @@ trrfs!(uplo::Char, trans::Char, diag::Char, A::StridedMatrix, B::StridedVecOrMat
 for (stev, stebz, stegr, stein, elty) in
     ((:dstev_,:dstebz_,:dstegr_,:dstein_,:Float64),
      (:sstev_,:sstebz_,:sstegr_,:sstein_,:Float32)
-#     , (:zstev_,:Complex128)  Need to rewrite for ZHEEV, rwork, etc.
-#     , (:cstev_,:Complex64)
+#     , (:zstev_,Complex{Float64})  Need to rewrite for ZHEEV, rwork, etc.
+#     , (:cstev_,Complex{Float32})
      )
     @eval begin
         function stev!(job::Char, dv::StridedVector{$elty}, ev::StridedVector{$elty})
@@ -4156,8 +4153,8 @@ end
 ## (SY) hermitian matrices - eigendecomposition, Bunch-Kaufman decomposition,
 ## solvers (direct and factored) and inverse.
 for (syconv, hesv, hetrf, hetri, hetrs, elty, relty) in
-    ((:zsyconv_,:zhesv_,:zhetrf_,:zhetri_,:zhetrs_,:Complex128, :Float64),
-     (:csyconv_,:chesv_,:chetrf_,:chetri_,:chetrs_,:Complex64, :Float32))
+    ((:zsyconv_,:zhesv_,:zhetrf_,:zhetri_,:zhetrs_,Complex{Float64}, :Float64),
+     (:csyconv_,:chesv_,:chetrf_,:chetri_,:chetrs_,Complex{Float32}, :Float32))
     @eval begin
        #   SUBROUTINE ZSYCONV( UPLO, WAY, N, A, LDA, IPIV, WORK, INFO )
        #
@@ -4325,8 +4322,8 @@ for (syconv, hesv, hetrf, hetri, hetrs, elty, relty) in
 end
 
 for (hesv, hetrf, hetri, hetrs, elty, relty) in
-    ((:zhesv_rook_,:zhetrf_rook_,:zhetri_rook_,:zhetrs_rook_,:Complex128, :Float64),
-     (:chesv_rook_,:chetrf_rook_,:chetri_rook_,:chetrs_rook_,:Complex64, :Float32))
+    ((:zhesv_rook_,:zhetrf_rook_,:zhetri_rook_,:zhetrs_rook_,Complex{Float64}, :Float64),
+     (:chesv_rook_,:chetrf_rook_,:chetri_rook_,:chetrs_rook_,Complex{Float32}, :Float32))
     @eval begin
         #       SUBROUTINE ZHESV_ROOK( UPLO, N, NRHS, A, LDA, IPIV, B, LDB, WORK,
         # *     .. Scalar Arguments ..
@@ -4441,8 +4438,8 @@ for (hesv, hetrf, hetri, hetrs, elty, relty) in
 end
 
 for (sysv, sytrf, sytri, sytrs, elty, relty) in
-    ((:zsysv_,:zsytrf_,:zsytri_,:zsytrs_,:Complex128, :Float64),
-     (:csysv_,:csytrf_,:csytri_,:csytrs_,:Complex64, :Float32))
+    ((:zsysv_,:zsytrf_,:zsytri_,:zsytrs_,Complex{Float64}, :Float64),
+     (:csysv_,:csytrf_,:csytri_,:csytrs_,Complex{Float32}, :Float32))
     @eval begin
         #       SUBROUTINE ZSYSV( UPLO, N, NRHS, A, LDA, IPIV, B, LDB, WORK,
         #      $                  LWORK, INFO )
@@ -4592,8 +4589,8 @@ for (sysv, sytrf, sytri, sytrs, elty, relty) in
 end
 
 for (sysv, sytrf, sytri, sytrs, syconvf, elty, relty) in
-    ((:zsysv_rook_,:zsytrf_rook_,:zsytri_rook_,:zsytrs_rook_,:zsyconvf_rook_,:Complex128, :Float64),
-     (:csysv_rook_,:csytrf_rook_,:csytri_rook_,:csytrs_rook_,:csyconvf_rook_,:Complex64, :Float32))
+    ((:zsysv_rook_,:zsytrf_rook_,:zsytri_rook_,:zsytrs_rook_,:zsyconvf_rook_,Complex{Float64}, :Float64),
+     (:csysv_rook_,:csytrf_rook_,:csytri_rook_,:csytrs_rook_,:csyconvf_rook_,Complex{Float32}, :Float32))
     @eval begin
         #       SUBROUTINE ZSYSV_ROOK(UPLO, N, NRHS, A, LDA, IPIV, B, LDB, WORK,
         #      $                      LWORK, INFO )
@@ -4997,8 +4994,8 @@ for (syev, syevr, sygvd, elty) in
 end
 # Hermitian eigensolvers
 for (syev, syevr, sygvd, elty, relty) in
-    ((:zheev_,:zheevr_,:zhegvd_,:Complex128,:Float64),
-     (:cheev_,:cheevr_,:chegvd_,:Complex64,:Float32))
+    ((:zheev_,:zheevr_,:zhegvd_,Complex{Float64},:Float64),
+     (:cheev_,:cheevr_,:chegvd_,Complex{Float32},:Float32))
     @eval begin
         # SUBROUTINE ZHEEV( JOBZ, UPLO, N, A, LDA, W, WORK, LWORK, RWORK, INFO )
         # *     .. Scalar Arguments ..
@@ -5195,8 +5192,8 @@ sygvd!(itype::Integer, jobz::Char, uplo::Char, A::StridedMatrix, B::StridedMatri
 for (bdsqr, relty, elty) in
     ((:dbdsqr_,:Float64,:Float64),
      (:sbdsqr_,:Float32,:Float32),
-     (:zbdsqr_,:Float64,:Complex128),
-     (:cbdsqr_,:Float32,:Complex64))
+     (:zbdsqr_,:Float64,Complex{Float64}),
+     (:cbdsqr_,:Float32,Complex{Float32}))
     @eval begin
         function bdsqr!(uplo::Char, d::StridedVector{$relty}, e_::StridedVector{$relty},
                         Vt::StridedMatrix{$elty}, U::StridedMatrix{$elty}, C::StridedMatrix{$elty})
@@ -5358,8 +5355,8 @@ for (gecon, elty) in
 end
 
 for (gecon, elty, relty) in
-    ((:zgecon_,:Complex128,:Float64),
-     (:cgecon_,:Complex64, :Float32))
+    ((:zgecon_,Complex{Float64},:Float64),
+     (:cgecon_,Complex{Float32}, :Float32))
     @eval begin
         #       SUBROUTINE ZGECON( NORM, N, A, LDA, ANORM, RCOND, WORK, RWORK,
         #      $                   INFO )
@@ -5404,8 +5401,8 @@ gecon!(normtype::Char, A::StridedMatrix, anorm)
 for (gehrd, elty) in
     ((:dgehrd_,:Float64),
      (:sgehrd_,:Float32),
-     (:zgehrd_,:Complex128),
-     (:cgehrd_,:Complex64))
+     (:zgehrd_,Complex{Float64}),
+     (:cgehrd_,Complex{Float32}))
     @eval begin
 
         #                 .. Scalar Arguments ..
@@ -5454,8 +5451,8 @@ gehrd!(ilo::Integer, ihi::Integer, A::StridedMatrix)
 for (orghr, elty) in
     ((:dorghr_,:Float64),
      (:sorghr_,:Float32),
-     (:zunghr_,:Complex128),
-     (:cunghr_,:Complex64))
+     (:zunghr_,Complex{Float64}),
+     (:cunghr_,Complex{Float32}))
     @eval begin
         # *     .. Scalar Arguments ..
         #       INTEGER            IHI, ILO, INFO, LDA, LWORK, N
@@ -5501,8 +5498,8 @@ orghr!(ilo::Integer, ihi::Integer, A::StridedMatrix, tau::StridedVector)
 for (ormhr, elty) in
     ((:dormhr_,:Float64),
      (:sormhr_,:Float32),
-     (:zunmhr_,:Complex128),
-     (:cunmhr_,:Complex64))
+     (:zunmhr_,Complex{Float64}),
+     (:cunmhr_,Complex{Float32}))
     @eval begin
         # .. Scalar Arguments ..
         # CHARACTER          side, trans
@@ -5642,8 +5639,8 @@ for (gees, gges, elty) in
 end
 
 for (gees, gges, elty, relty) in
-    ((:zgees_,:zgges_,:Complex128,:Float64),
-     (:cgees_,:cgges_,:Complex64,:Float32))
+    ((:zgees_,:zgges_,Complex{Float64},:Float64),
+     (:cgees_,:cgges_,Complex{Float32},:Float32))
     @eval begin
         # *     .. Scalar Arguments ..
         #       CHARACTER          JOBVS, SORT
@@ -5913,8 +5910,8 @@ for (trexc, trsen, tgsen, elty) in
 end
 
 for (trexc, trsen, tgsen, elty, relty) in
-    ((:ztrexc_, :ztrsen_, :ztgsen_, :Complex128, :Float64),
-     (:ctrexc_, :ctrsen_, :ctgsen_, :Complex64, :Float32))
+    ((:ztrexc_, :ztrsen_, :ztgsen_, Complex{Float64}, :Float64),
+     (:ctrexc_, :ctrsen_, :ctgsen_, Complex{Float32}, :Float32))
     @eval begin
         #      .. Scalar Arguments ..
         #      CHARACTER          COMPQ
@@ -6093,8 +6090,8 @@ tgsen!(select::StridedVector{BlasInt}, S::StridedMatrix, T::StridedMatrix, Q::St
 
 for (fn, elty, relty) in ((:dtrsyl_, :Float64, :Float64),
                    (:strsyl_, :Float32, :Float32),
-                   (:ztrsyl_, :Complex128, :Float64),
-                   (:ctrsyl_, :Complex64, :Float32))
+                   (:ztrsyl_, Complex{Float64}, :Float64),
+                   (:ctrsyl_, Complex{Float32}, :Float32))
     @eval begin
         function trsyl!(transa::Char, transb::Char, A::StridedMatrix{$elty},
                         B::StridedMatrix{$elty}, C::StridedMatrix{$elty}, isgn::Int=1)
