@@ -110,9 +110,6 @@ function choosetests(choices = [])
 
 
     sparsetests = ["sparse/sparse", "sparse/sparsevector", "sparse/higherorderfns"]
-    if Base.USE_GPL_LIBS
-        append!(sparsetests, ["sparse/umfpack", "sparse/cholmod", "sparse/spqr"])
-    end
     if "sparse" in skip_tests
         filter!(x -> (x != "sparse" && !(x in sparsetests)), tests)
     elseif "sparse" in tests
