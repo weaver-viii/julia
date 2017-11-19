@@ -2,9 +2,9 @@
 
 ## RandomDevice
 
-# SamplerTypes(Union{X,Y,...}) == Union{SamplerType{X},SamplerType{Y},...}
-SamplerTypes(U::Union) = Union{map(T->SamplerType{T}, Base.uniontypes(U))...}
-const SamplerBoolBitInteger = SamplerTypes(Union{Bool, Base.BitInteger})
+# SamplerUnion(Union{X,Y,...}) == Union{SamplerType{X},SamplerType{Y},...}
+SamplerUnion(U::Union) = Union{map(T->SamplerType{T}, Base.uniontypes(U))...}
+const SamplerBoolBitInteger = SamplerUnion(Union{Bool, Base.BitInteger})
 
 if Sys.iswindows()
     struct RandomDevice <: AbstractRNG
@@ -244,7 +244,7 @@ rand(r::MersenneTwister, st::SamplerTrivial{<:FloatInterval}) = rand_generic(r, 
 #### integers
 
 rand(r::MersenneTwister,
-     T::SamplerTypes(Union{Bool,Int8,UInt8,Int16,UInt16,Int32,UInt32})) =
+     T::SamplerUnion(Union{Bool,Int8,UInt8,Int16,UInt16,Int32,UInt32})) =
          rand_ui52_raw(r) % T[]
 
 function rand(r::MersenneTwister, ::SamplerType{UInt64})
