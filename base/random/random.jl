@@ -42,12 +42,12 @@ Base.eltype(::Type{<:FloatInterval{T}}) where {T<:AbstractFloat} = T
 
 const BitFloatType = Union{Type{Float16},Type{Float32},Type{Float64}}
 
-### Sample
+### Sampler
 
-abstract type Sample end
+abstract type Sampler end
 
 # temporarily for BaseBenchmarks
-RangeGenerator(x) = Sample(GLOBAL_RNG, x)
+RangeGenerator(x) = Sampler(GLOBAL_RNG, x)
 
 # In some cases, when only 1 random value is to be generated,
 # the optimal sampler can be different than if multiple values
@@ -57,49 +57,49 @@ const Repetition = Union{Val{1},Val{Inf}}
 
 # these default fall-back for all RNGs would be nice,
 # but generate difficult-to-solve ambiguities
-# Sample(::AbstractRNG, X, ::Val{Inf}) = Sample(X)
-# Sample(::AbstractRNG, ::Type{X}, ::Val{Inf}) where {X} = Sample(X)
+# Sampler(::AbstractRNG, X, ::Val{Inf}) = Sampler(X)
+# Sampler(::AbstractRNG, ::Type{X}, ::Val{Inf}) where {X} = Sampler(X)
 
-Sample(rng::AbstractRNG, st::Sample, ::Repetition) =
-    throw(ArgumentError("Sample for this object is not defined"))
+Sampler(rng::AbstractRNG, st::Sampler, ::Repetition) =
+    throw(ArgumentError("Sampler for this object is not defined"))
 
 # default shortcut for the general case
-Sample(rng::AbstractRNG, X) = Sample(rng, X, Val(Inf))
-Sample(rng::AbstractRNG, ::Type{X}) where {X} = Sample(rng, X, Val(Inf))
+Sampler(rng::AbstractRNG, X) = Sampler(rng, X, Val(Inf))
+Sampler(rng::AbstractRNG, ::Type{X}) where {X} = Sampler(rng, X, Val(Inf))
 
-#### pre-defined useful Sample subtypes
+#### pre-defined useful Sampler subtypes
 
 # default fall-back for types
-struct SampleType{T} <: Sample end
+struct SamplerType{T} <: Sampler end
 
-Sample(::AbstractRNG, ::Type{T}, ::Repetition) where {T} = SampleType{T}()
+Sampler(::AbstractRNG, ::Type{T}, ::Repetition) where {T} = SamplerType{T}()
 
-Base.getindex(st::SampleType{T}) where {T} = T
+Base.getindex(st::SamplerType{T}) where {T} = T
 
 # default fall-back for values
-struct SampleTrivial{T} <: Sample
+struct SamplerTrivial{T} <: Sampler
     self::T
 end
 
-Sample(::AbstractRNG, X, ::Repetition) = SampleTrivial(X)
+Sampler(::AbstractRNG, X, ::Repetition) = SamplerTrivial(X)
 
-Base.getindex(st::SampleTrivial) = st.self
+Base.getindex(st::SamplerTrivial) = st.self
 
-struct SampleSimple{T,S} <: Sample
+struct SamplerSimple{T,S} <: Sampler
     self::T
     state::S
 end
 
-Base.getindex(st::SampleSimple) = st.self
+Base.getindex(st::SamplerSimple) = st.self
 
 
-### machinery for generation with Sample
+### machinery for generation with Sampler
 
 #### scalars
 
-rand(rng::AbstractRNG, X) = rand(rng, Sample(rng, X, Val(1)))
+rand(rng::AbstractRNG, X) = rand(rng, Sampler(rng, X, Val(1)))
 rand(rng::AbstractRNG=GLOBAL_RNG, ::Type{X}=Float64) where {X} =
-    rand(rng, Sample(rng, X, Val(1)))
+    rand(rng, Sampler(rng, X, Val(1)))
 
 rand(X) = rand(GLOBAL_RNG, X)
 rand(::Type{X}) where {X} = rand(GLOBAL_RNG, X)
@@ -109,10 +109,10 @@ rand(::Type{X}) where {X} = rand(GLOBAL_RNG, X)
 rand!(A::AbstractArray{T}, X) where {T} = rand!(GLOBAL_RNG, A, X)
 rand!(A::AbstractArray{T}, ::Type{X}=T) where {T,X} = rand!(GLOBAL_RNG, A, X)
 
-rand!(rng::AbstractRNG, A::AbstractArray{T}, X) where {T} = rand!(rng, A, Sample(rng, X))
-rand!(rng::AbstractRNG, A::AbstractArray{T}, ::Type{X}=T) where {T,X} = rand!(rng, A, Sample(rng, X))
+rand!(rng::AbstractRNG, A::AbstractArray{T}, X) where {T} = rand!(rng, A, Sampler(rng, X))
+rand!(rng::AbstractRNG, A::AbstractArray{T}, ::Type{X}=T) where {T,X} = rand!(rng, A, Sampler(rng, X))
 
-function rand!(rng::AbstractRNG, A::AbstractArray{T}, st::Sample) where T
+function rand!(rng::AbstractRNG, A::AbstractArray{T}, st::Sampler) where T
     for i in eachindex(A)
         @inbounds A[i] = rand(rng, st)
     end
