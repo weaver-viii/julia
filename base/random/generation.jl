@@ -2,6 +2,17 @@
 
 # Uniform random generation
 
+# This file contains the creation of Sampler objects and the associated generation of
+# random values from them. More specifically, given the specification S of a set
+# of values to pick from (e.g. 1:10, or "a string"), we define
+#
+# 1) Sampler(rng, S, ::Repetition) -> sampler
+# 2) rand(rng, sampler) -> random value
+#
+# Note that the 1) is automated when when the sampler is not intended to carry information,
+# i.e. the default fall-backs SamplerType and SamplerTrivial are used.
+
+
 ## from types: rand(::Type, [dims...])
 
 ### random floats

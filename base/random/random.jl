@@ -95,6 +95,10 @@ Base.getindex(st::SamplerSimple) = st.self
 
 ### machinery for generation with Sampler
 
+# This describes how to generate random scalars or arrays, by generating a Sampler
+# and calling rand on it (which should be defined in "generation.jl").
+# NOTE: this section could be moved into a separate file when more containers are supported.
+
 #### scalars
 
 rand(rng::AbstractRNG, X) = rand(rng, Sampler(rng, X, Val(1)))

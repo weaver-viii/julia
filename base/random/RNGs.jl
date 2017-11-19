@@ -2,7 +2,7 @@
 
 ## RandomDevice
 
-# SamplerTypes(Union{X,Y,...}) = Union{SamplerType{X},SamplerType{Y},...}
+# SamplerTypes(Union{X,Y,...}) == Union{SamplerType{X},SamplerType{Y},...}
 SamplerTypes(U::Union) = Union{map(T->SamplerType{T}, Base.uniontypes(U))...}
 const SamplerBoolBitInteger = SamplerTypes(Union{Bool, Base.BitInteger})
 
