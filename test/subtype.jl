@@ -1156,11 +1156,6 @@ end
               Int64,Float64,Int64,Float64,Int64,Float64,Int64,Float64,Int64,Float64,Int64,Float64,
               Int64,Float64,Int64,Float64,Int64,Float64,Int64,Float64} <: (Tuple{Vararg{T}} where T<:Number))
 
-# PR #24399
-let (t, e) = intersection_env(Tuple{Union{Int,Int8}}, Tuple{T} where T)
-    @test e[1] isa TypeVar
-end
-
 # issue #24305
 f24305(x) = [g24305(x) g24305(x) g24305(x) g24305(x); g24305(x) g24305(x) 0 0];
 @test_throws UndefVarError f24305(1)
