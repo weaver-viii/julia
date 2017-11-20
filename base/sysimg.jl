@@ -397,8 +397,8 @@ include("statistics.jl")
 # libgit2 support
 include("libgit2/libgit2.jl")
 
-# package manager
-include("pkg/pkg.jl")
+# package manager replacement functions
+include("_pkg.jl")
 
 # dates
 include("dates/Dates.jl")
@@ -422,7 +422,7 @@ include("loading.jl")
 # set up load path to be able to find stdlib packages
 init_load_path(ccall(:jl_get_julia_home, Any, ()))
 
-INCLUDE_STATE = 3 # include = include_relative
+INCLUDE_STATE = 3 # include = include_
 
 import Base64
 
@@ -471,6 +471,7 @@ using Base
 unshift!(Base._included_files, (@__MODULE__, joinpath(@__DIR__, "sysimg.jl")))
 
 # load some stdlib packages but don't put their names in Main
+Base.require(:Pkg)
 Base.require(:DelimitedFiles)
 Base.require(:Test)
 

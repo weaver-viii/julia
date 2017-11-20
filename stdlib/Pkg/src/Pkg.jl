@@ -288,6 +288,9 @@ Set the protocol used to access GitHub-hosted packages. Defaults to 'https', wit
 """
 setprotocol!(proto::AbstractString) = Cache.setprotocol!(proto)
 
+# Fill in the hooks for Pkg methods in Base
+Base._Pkg.status[] = status
+Base._Pkg.dir[]    = dir
 
 # point users to PkgDev
 register(args...) =
