@@ -761,7 +761,7 @@ function whos(io::IO=STDOUT, m::Module=Main, pattern::Regex=r"")
             catch e
                 print(head, "#=ERROR: unable to show value=#")
             end
-            newline = search(head, UInt8('\n')) - 1
+            newline = findfirst(equalto(UInt8('\n')), head) - 1
             if newline < 0
                 newline = nb_available(head)
             end
