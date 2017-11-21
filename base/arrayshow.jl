@@ -16,8 +16,9 @@
 # The array printing methods here can be grouped into two categories (and are annotated as such):
 # 1) "typeinfo aware" : these are "API boundaries" functions, which will read the typeinfo
 #    property from the context, and pass down to their value an updated property
-#    according to its eltype;
-# 2) "typeinfo agnostic": this are helper functions used by the first category; hence
+#    according to its eltype; at each layer of nesting, only one "typeinfo aware"
+#    function must be called;
+# 2) "typeinfo agnostic": these are helper functions used by the first category; hence
 #    they don't manipulate the typeinfo property, and let the printing routines
 #    for their elements read directly the property set by their callers
 #
