@@ -1007,7 +1007,7 @@ end
     @test showstr([[Int16(1)]]) == "Array{Int16,1}[[1]]"
     @test showstr(Set([[Int16(1)]])) == "Set(Array{Int16,1}[[1]])"
     @test showstr([Float16(1)]) == "Float16[1.0]"
-    @test showstr([[Float16(1)]]) == "Array{Float16}[[1.0]]"
+    @test showstr([[Float16(1)]]) == "Array{Float16,1}[[1.0]]"
     @testset "nested Any eltype" begin
         x = Any[Any[Any[1]]]
         # The element of x (i.e. x[1]) has an eltype which can't be deduced
