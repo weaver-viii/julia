@@ -4,6 +4,8 @@
 include("testenv.jl")
 
 replstr(x) = sprint((io,x) -> show(IOContext(io, :limit => true, :displaysize => (24, 80)), MIME("text/plain"), x), x)
+showstr(x) = sprint((io,x) -> show(IOContext(io, :limit => true, :displaysize => (24, 80)), x), x)
+
 
 @test replstr(Array{Any}(2)) == "2-element Array{Any,1}:\n #undef\n #undef"
 @test replstr(Array{Any}(2,2)) == "2×2 Array{Any,2}:\n #undef  #undef\n #undef  #undef"
@@ -658,13 +660,6 @@ test_mt(show_f5, "show_f5(A::AbstractArray{T,N}, indexes::Vararg{$Int,N})")
 @test_repr "continue"
 @test_repr "break"
 
-@testset "nested Any eltype" begin
-    x = Any[Any[Any[1]]]
-    # The element of x (i.e. x[1]) has an eltype which can't be deduced
-    # from eltype(x), so this must also be printed
-    @test replstr(x) == "1-element Array{Any,1}:\n Any[Any[1]]"
-end
-
 let x = [], y = []
     push!(x, y)
     push!(y, x)
@@ -1005,4 +1000,18 @@ end
     show(io, "text/html", m)
     s = String(take!(io))
     @test contains(s, " in Base.Math ")
+end
+
+@testset "typeinfo" begin
+    @test replstr([[Int16(1)]]) == "1-element Array{Array{Int16,1},1}:\n [1]"
+    @test showstr([[Int16(1)]]) == "Array{Int16,1}[[1]]"
+    @test showstr(Set([[Int16(1)]])) == "Set(Array{Int16,1}[[1]])"
+    @test showstr([Float16(1)]) == "Float16[1.0]"
+    @test showstr([[Float16(1)]]) == "Array{Float16}[[1.0]]"
+    @testset "nested Any eltype" begin
+        x = Any[Any[Any[1]]]
+        # The element of x (i.e. x[1]) has an eltype which can't be deduced
+        # from eltype(x), so this must also be printed
+        @test replstr(x) == "1-element Array{Any,1}:\n Any[Any[1]]"
+    end
 end
