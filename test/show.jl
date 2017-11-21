@@ -8,7 +8,7 @@ replstr(x) = sprint((io,x) -> show(IOContext(io, :limit => true, :displaysize =>
 @test replstr(Array{Any}(2)) == "2-element Array{Any,1}:\n #undef\n #undef"
 @test replstr(Array{Any}(2,2)) == "2×2 Array{Any,2}:\n #undef  #undef\n #undef  #undef"
 @test replstr(Array{Any}(2,2,2)) == "2×2×2 Array{Any,3}:\n[:, :, 1] =\n #undef  #undef\n #undef  #undef\n\n[:, :, 2] =\n #undef  #undef\n #undef  #undef"
-@test replstr([1f10]) == "1-element Array{Float32,1}:\n 1.0f10"
+@test replstr([1f10]) == "1-element Array{Float32,1}:\n 1.0e10"
 
 struct T5589
     names::Vector{String}
@@ -699,9 +699,9 @@ let io = IOBuffer()
 end
 
 # PR 17117
-# test show array
+# test print_array
 let s = IOBuffer(Array{UInt8}(0), true, true)
-    Base.showarray(s, [1, 2, 3], false, header = false)
+    Base.print_array(s, [1, 2, 3])
     @test String(resize!(s.data, s.size)) == " 1\n 2\n 3"
 end
 
@@ -933,8 +933,7 @@ end
 @testset "Array printing with limited rows" begin
     arrstr = let buf = IOBuffer()
         function (A, rows)
-            Base.showarray(IOContext(buf, :displaysize => (rows, 80), :limit => true),
-                           A, false, header=true)
+            Base._display(IOContext(buf, :displaysize => (rows, 80), :limit => true), A)
             String(take!(buf))
         end
     end
