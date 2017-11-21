@@ -2194,6 +2194,10 @@ end
     @deprecate chol!(x::Number, uplo) chol(x) false
 end
 
+@deprecate cumsum(A::AbstractArray)     cumsum(A, 1)
+@deprecate cumsum_kbn(A::AbstractArray) cumsum_kbn(A, 1)
+@deprecate cumprod(A::AbstractArray)    cumprod(A, 1)
+
 # END 0.7 deprecations
 
 # BEGIN 1.0 deprecations
