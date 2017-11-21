@@ -658,6 +658,13 @@ test_mt(show_f5, "show_f5(A::AbstractArray{T,N}, indexes::Vararg{$Int,N})")
 @test_repr "continue"
 @test_repr "break"
 
+@testset "nested Any eltype" begin
+    x = Any[Any[Any[1]]]
+    # The element of x (i.e. x[1]) has an eltype which can't be deduced
+    # from eltype(x), so this must also be printed
+    @test replstr(x) == "1-element Array{Any,1}:\n Any[Any[1]]"
+end
+
 let x = [], y = []
     push!(x, y)
     push!(y, x)

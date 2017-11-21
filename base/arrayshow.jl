@@ -483,13 +483,45 @@ show(io::IO, X::AbstractVector) = show_vector(io, X)
 
 ## Logic for displaying type information
 
+# given type `typeinfo` extracted from context, assuming a collection
+# is being displayed, deduce the elements type; in spirit this is
+# similar to `eltype`, but in some cases this would lead to incomplete
+# information: assume we are at the top level, and no typeinfo is set,
+# and that it is deduced to be typeinfo=Any by default, and consider
+# printing X = Any[1]; to know if the eltype of X is already diplayed,
+# we would compare eltype(X) to eltype(typeinfo) == Any, and deduce
+# that we don't need to print X's eltype because it's already known by
+# the context, which is wrong; even if default value of typeinfo is
+# not set to Any, then the problem would be similar one layer below
+# when printing an array like Any[Any[1]]; hence we must treat Any
+# specially (alternatively we could also specialize
+# `collection_eltype` for all known collection types, but this seems
+# like a heavy solution when the simpler solution seems to be enough)
+function collection_eltype(typeinfo::Union{DataType,UnionAll})::Union{DataType,UnionAll,Void}
+    if typeinfo == Any
+        # the current context knows nothing about what is being displayed, not even
+        # whether it's a collection or scalar
+        nothing
+    else
+        # this function is assumed to be called (e.g. from
+        # typeinfo_prefix) when the current object to display is a
+        # collection X, let's say of type Set{T}, but we also know
+        # that typeof(X) must be a sub-type of typeinfo != Any, for
+        # example typeinfo == AbstractSet{T}; then it's fair to assume
+        # that typeinfo is refering to a collection-like type (being
+        # a strict subtype of Any), and hence that what the context
+        # knows about eltype(X) is eltype(typeinfo)
+        eltype(typeinfo)
+    end
+end
+
 # X not constrained, can be any iterable (cf. show_vector)
 function typeinfo_prefix(io::IO, X)
     typeinfo = get(io, :typeinfo, Any)::Union{DataType,UnionAll}
     @assert X isa typeinfo
     # what the context already knows about the eltype of X:
     # (could use a more specific tool than eltype, maybe with _isleaftype)
-    eltype_ctx = eltype(typeinfo)
+    eltype_ctx = collection_eltype(typeinfo)
     eltype_X = eltype(X)
     # Types hard-coded here are those which are created by default for a given syntax
     if eltype_X == eltype_ctx || !isempty(X) && eltype_X in (Float64, Int, Char, String)
